@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+.vite
+coverage
+*.tsbuildinfo
+dev-server.*.log
+.playwright-mcp
