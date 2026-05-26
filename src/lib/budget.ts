@@ -61,6 +61,12 @@ export interface CategoryPieSegment {
   percentage: number;
 }
 
+export interface SubcategoryGroup {
+  label: string;
+  total: number;
+  transactions: Transaction[];
+}
+
 export const DEFAULT_CURRENCY = import.meta.env.VITE_BUDGET_CURRENCY || "PHP";
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -197,6 +203,37 @@ export function calculateCategoryPieSegments(
       value,
       percentage: total > 0 ? Math.round((value / total) * 100) : 0
   }));
+}
+
+export function calculateSubcategoryGroups(
+  transactions: Transaction[],
+  year: number,
+  month: number,
+  type: TransactionType
+): SubcategoryGroup[] {
+  const subcategories = transactionSubcategoriesByType[type] ?? [];
+
+  if (subcategories.length === 0) {
+    return [];
+  }
+
+  const categoryTransactions = filterTransactionsByMonth(transactions, year, month).filter(
+    (transaction) => transaction.type === type
+  );
+
+  return subcategories.map((label) => {
+    const groupTransactions = categoryTransactions.filter(
+      (transaction) => normalizeTransactionSubcategory(transaction) === label
+    );
+
+    return {
+      label,
+      total: toMoney(
+        groupTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
+      ),
+      transactions: groupTransactions
+    };
+  });
 }
 
 export function validateTransactionInput(values: TransactionFormValues): ValidationResult {

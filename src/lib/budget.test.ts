@@ -3,6 +3,7 @@ import {
   calculateAnnualReport,
   calculateBudgetSummary,
   calculateCategoryPieSegments,
+  calculateSubcategoryGroups,
   filterTransactionsByMonth,
   formatCurrency,
   normalizeTransactionSubcategory,
@@ -294,6 +295,86 @@ describe("subcategory helpers", () => {
     expect(calculateCategoryPieSegments(transactions, 2026, 5, "non_essentials")).toEqual([
       { label: "Dinner", value: 4000, percentage: 100 }
     ]);
+  });
+
+  it("groups essentials transactions into all subcategory cards with totals", () => {
+    const result = calculateSubcategoryGroups(
+      [
+        ...transactions,
+        {
+          id: "6",
+          type: "bills",
+          subcategory: "House",
+          amount: 8000,
+          date: "2026-05-12",
+          description: "Repairs",
+          notes: "",
+          createdAt: "2026-05-12T00:00:00.000Z",
+          updatedAt: "2026-05-12T00:00:00.000Z"
+        },
+        {
+          id: "7",
+          type: "bills",
+          subcategory: "Credit Card",
+          amount: 5000,
+          date: "2026-04-18",
+          description: "Prior month card",
+          notes: "",
+          createdAt: "2026-04-18T00:00:00.000Z",
+          updatedAt: "2026-04-18T00:00:00.000Z"
+        }
+      ],
+      2026,
+      5,
+      "bills"
+    );
+
+    expect(result.map((group) => ({
+      label: group.label,
+      total: group.total,
+      transactionIds: group.transactions.map((transaction) => transaction.id)
+    }))).toEqual([
+      { label: "Bills", total: 12000, transactionIds: ["2"] },
+      { label: "House", total: 8000, transactionIds: ["6"] },
+      { label: "Lot", total: 0, transactionIds: [] },
+      { label: "Credit Card", total: 0, transactionIds: [] }
+    ]);
+  });
+
+  it("groups savings transactions and applies legacy fallback subcategories", () => {
+    const result = calculateSubcategoryGroups(
+      [
+        ...transactions,
+        {
+          id: "6",
+          type: "savings",
+          subcategory: "Emergency Funds",
+          amount: 5000,
+          date: "2026-05-12",
+          description: "Emergency transfer",
+          notes: "",
+          createdAt: "2026-05-12T00:00:00.000Z",
+          updatedAt: "2026-05-12T00:00:00.000Z"
+        }
+      ],
+      2026,
+      5,
+      "savings"
+    );
+
+    expect(result.map((group) => ({
+      label: group.label,
+      total: group.total,
+      transactionIds: group.transactions.map((transaction) => transaction.id)
+    }))).toEqual([
+      { label: "Cash Savings", total: 15000, transactionIds: ["4"] },
+      { label: "Emergency Funds", total: 5000, transactionIds: ["6"] }
+    ]);
+  });
+
+  it("returns no subcategory groups for categories without subcategories", () => {
+    expect(calculateSubcategoryGroups(transactions, 2026, 5, "income")).toEqual([]);
+    expect(calculateSubcategoryGroups(transactions, 2026, 5, "non_essentials")).toEqual([]);
   });
 });
 

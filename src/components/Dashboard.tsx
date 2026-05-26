@@ -167,6 +167,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 <TransactionSection
                   key={type}
                   type={type}
+                  year={selectedYear}
+                  month={selectedMonth}
                   transactions={monthlyTransactions.filter(
                     (transaction) => transaction.type === type
                   )}
