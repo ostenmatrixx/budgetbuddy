@@ -1,14 +1,20 @@
-import { formatCurrency } from "../lib/budget";
+import {
+  formatCurrency,
+  normalizeTransactionSubcategory,
+  type CategoryPieSegment
+} from "../lib/budget";
 import {
   transactionTypeLabels,
   transactionTypeShortLabels,
   type Transaction,
   type TransactionType
 } from "../types/transaction";
+import CategoryPieChart from "./CategoryPieChart";
 
 interface TransactionSectionProps {
   type: TransactionType;
   transactions: Transaction[];
+  pieSegments: CategoryPieSegment[];
   onAdd: () => void;
   onDelete: (transaction: Transaction) => void;
   onEdit: (transaction: Transaction) => void;
@@ -17,6 +23,7 @@ interface TransactionSectionProps {
 export default function TransactionSection({
   type,
   transactions,
+  pieSegments,
   onAdd,
   onDelete,
   onEdit
@@ -39,6 +46,8 @@ export default function TransactionSection({
         </button>
       </div>
 
+      <CategoryPieChart segments={pieSegments} />
+
       <div className="mt-4 divide-y divide-ecru/60">
         {transactions.length === 0 ? (
           <p className="rounded-lg bg-light-red/5 px-3 py-4 text-sm text-black-bean/70">
@@ -54,6 +63,7 @@ export default function TransactionSection({
                 <p className="font-semibold">{transaction.description}</p>
                 <p className="mt-1 text-sm text-black-bean/70">
                   {transaction.date}
+                  {` - ${normalizeTransactionSubcategory(transaction)}`}
                   {transaction.notes ? ` - ${transaction.notes}` : ""}
                 </p>
               </div>

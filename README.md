@@ -5,10 +5,13 @@ A simple personal budget tracker built with Vite, React, TypeScript, Tailwind CS
 ## Features
 
 - Password gate using `ADMIN_PASSWORD`
-- One dashboard for monthly income, bills, non-essential spending, and savings
+- One dashboard for monthly income, essentials, non-essential spending, and savings
 - 50/30/20 budget targets with progress bars
 - CRUD for every transaction category
+- Essentials and savings subcategories
+- Category pie charts on monthly cards
 - Month and year selector
+- Annual report dashboard with bar graphs
 - Calendar with daily transaction indicators
 - Daily log with edit and delete controls
 - PHP currency formatting by default

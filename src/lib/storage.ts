@@ -93,6 +93,7 @@ function isTransaction(value: unknown): value is Transaction {
     typeof transaction.date === "string" &&
     typeof transaction.description === "string" &&
     typeof transaction.notes === "string" &&
+    (transaction.subcategory === undefined || typeof transaction.subcategory === "string") &&
     typeof transaction.createdAt === "string" &&
     typeof transaction.updatedAt === "string"
   );

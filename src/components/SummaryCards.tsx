@@ -6,10 +6,10 @@ interface SummaryCardsProps {
 
 export default function SummaryCards({ summary }: SummaryCardsProps) {
   const items = [
-    { label: "Total Income", value: summary.totalIncome },
-    { label: "Bills Spent", value: summary.billsSpent },
-    { label: "Non-Essentials Spent", value: summary.nonEssentialsSpent },
-    { label: "Savings Saved", value: summary.savingsSaved },
+    { label: "Income", value: summary.totalIncome },
+    { label: "Essentials", value: summary.billsSpent },
+    { label: "Non-Essentials", value: summary.nonEssentialsSpent },
+    { label: "Savings", value: summary.savingsSaved },
     { label: "Total Spent", value: summary.totalSpent },
     { label: "Remaining Income", value: summary.remainingIncome, alert: summary.remainingIncome < 0 }
   ];

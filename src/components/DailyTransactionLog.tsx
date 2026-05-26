@@ -1,4 +1,4 @@
-import { formatCurrency } from "../lib/budget";
+import { formatCurrency, normalizeTransactionSubcategory } from "../lib/budget";
 import {
   transactionTypeShortLabels,
   type Transaction
@@ -52,6 +52,9 @@ export default function DailyTransactionLog({
                   {transaction.notes ? (
                     <p className="mt-1 text-sm text-black-bean/70">{transaction.notes}</p>
                   ) : null}
+                  <p className="mt-1 text-xs font-semibold text-black-bean/55">
+                    {normalizeTransactionSubcategory(transaction)}
+                  </p>
                 </div>
                 <strong>{formatCurrency(transaction.amount)}</strong>
               </div>

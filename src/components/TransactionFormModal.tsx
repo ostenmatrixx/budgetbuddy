@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
-import { validateTransactionInput } from "../lib/budget";
+import { normalizeTransactionSubcategory, validateTransactionInput } from "../lib/budget";
 import {
+  transactionSubcategoriesByType,
   transactionTypeShortLabels,
   transactionTypes,
   type Transaction,
@@ -25,8 +26,13 @@ export default function TransactionFormModal({
   onClose,
   onSubmit
 }: TransactionFormModalProps) {
+  const initialSubcategory =
+    transaction && transactionSubcategoriesByType[transaction.type]
+      ? normalizeTransactionSubcategory(transaction)
+      : "";
   const [values, setValues] = useState<TransactionFormValues>(() => ({
     type: transaction?.type ?? initialType ?? "",
+    subcategory: initialSubcategory,
     amount: transaction ? String(transaction.amount) : "",
     date: transaction?.date ?? defaultDate ?? new Date().toISOString().slice(0, 10),
     description: transaction?.description ?? "",
@@ -37,6 +43,11 @@ export default function TransactionFormModal({
   function updateValue(field: keyof TransactionFormValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  function updateType(value: string) {
+    setValues((current) => ({ ...current, type: value, subcategory: "" }));
+    setErrors((current) => ({ ...current, type: undefined, subcategory: undefined }));
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -50,6 +61,9 @@ export default function TransactionFormModal({
 
     onSubmit(result.value);
   }
+
+  const selectedType = transactionTypes.find((type) => type === values.type);
+  const subcategories = selectedType ? transactionSubcategoriesByType[selectedType] : undefined;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black-bean/45 px-3 py-4 sm:items-center sm:justify-center">
@@ -79,7 +93,7 @@ export default function TransactionFormModal({
             <select
               className="mt-2 w-full rounded-lg border border-ecru bg-white/70 px-3 py-2 outline-none transition focus:border-maroon focus:ring-2 focus:ring-maroon/20"
               value={values.type}
-              onChange={(event) => updateValue("type", event.target.value)}
+              onChange={(event) => updateType(event.target.value)}
             >
               <option value="">Choose type</option>
               {transactionTypes.map((type) => (
@@ -90,6 +104,27 @@ export default function TransactionFormModal({
             </select>
             {errors.type ? <span className="mt-1 block text-xs text-maroon">{errors.type}</span> : null}
           </label>
+
+          {subcategories ? (
+            <label className="text-sm font-semibold">
+              Subcategory
+              <select
+                className="mt-2 w-full rounded-lg border border-ecru bg-white/70 px-3 py-2 outline-none transition focus:border-maroon focus:ring-2 focus:ring-maroon/20"
+                value={values.subcategory ?? ""}
+                onChange={(event) => updateValue("subcategory", event.target.value)}
+              >
+                <option value="">Choose subcategory</option>
+                {subcategories.map((subcategory) => (
+                  <option key={subcategory} value={subcategory}>
+                    {subcategory}
+                  </option>
+                ))}
+              </select>
+              {errors.subcategory ? (
+                <span className="mt-1 block text-xs text-maroon">{errors.subcategory}</span>
+              ) : null}
+            </label>
+          ) : null}
 
           <label className="text-sm font-semibold">
             Amount

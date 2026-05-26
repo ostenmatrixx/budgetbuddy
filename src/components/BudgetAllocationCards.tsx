@@ -7,7 +7,7 @@ interface BudgetAllocationCardsProps {
 export default function BudgetAllocationCards({ summary }: BudgetAllocationCardsProps) {
   const cards = [
     {
-      label: "50% Essentials / Bills",
+      label: "50% Essentials",
       target: summary.essentialsTarget,
       actual: summary.billsSpent,
       remainingLabel: "Essentials remaining",
