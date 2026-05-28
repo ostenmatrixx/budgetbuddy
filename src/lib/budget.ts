@@ -17,6 +17,27 @@ export interface ValidationResult {
   value?: TransactionDraft;
 }
 
+export interface BudgetPreference {
+  essentialsPercent: number;
+  savingsPercent: number;
+  nonEssentialsPercent: number;
+}
+
+export type BudgetPreferenceKey = keyof BudgetPreference;
+
+export interface BudgetPreferenceErrors {
+  essentialsPercent?: string;
+  savingsPercent?: string;
+  nonEssentialsPercent?: string;
+  total?: string;
+}
+
+export interface BudgetPreferenceValidationResult {
+  isValid: boolean;
+  errors: BudgetPreferenceErrors;
+  value?: BudgetPreference;
+}
+
 export interface BudgetSummary {
   totalIncome: number;
   billsSpent: number;
@@ -67,6 +88,24 @@ export interface SubcategoryGroup {
   transactions: Transaction[];
 }
 
+export type TransactionSortOrder = "newest" | "oldest";
+
+export interface TransactionPage {
+  items: Transaction[];
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export const DEFAULT_BUDGET_PREFERENCES: BudgetPreference = {
+  essentialsPercent: 50,
+  savingsPercent: 30,
+  nonEssentialsPercent: 20
+};
+
+export const TRANSACTION_PAGE_SIZE = 5;
 export const DEFAULT_CURRENCY = import.meta.env.VITE_BUDGET_CURRENCY || "PHP";
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -88,7 +127,8 @@ export function filterTransactionsByMonth(
 export function calculateBudgetSummary(
   transactions: Transaction[],
   year: number,
-  month: number
+  month: number,
+  budgetPreference: BudgetPreference = DEFAULT_BUDGET_PREFERENCES
 ): BudgetSummary {
   const monthlyTransactions = filterTransactionsByMonth(transactions, year, month);
   const totalIncome = sumByType(monthlyTransactions, "income");
@@ -97,9 +137,11 @@ export function calculateBudgetSummary(
   const savingsSaved = sumByType(monthlyTransactions, "savings");
   const totalSpent = toMoney(billsSpent + nonEssentialsSpent);
   const remainingIncome = toMoney(totalIncome - billsSpent - nonEssentialsSpent - savingsSaved);
-  const essentialsTarget = toMoney(totalIncome * 0.5);
-  const savingsTarget = toMoney(totalIncome * 0.3);
-  const nonEssentialsTarget = toMoney(totalIncome * 0.2);
+  const essentialsTarget = toMoney(totalIncome * (budgetPreference.essentialsPercent / 100));
+  const savingsTarget = toMoney(totalIncome * (budgetPreference.savingsPercent / 100));
+  const nonEssentialsTarget = toMoney(
+    totalIncome * (budgetPreference.nonEssentialsPercent / 100)
+  );
 
   return {
     totalIncome,
@@ -114,6 +156,134 @@ export function calculateBudgetSummary(
     essentialsRemaining: toMoney(essentialsTarget - billsSpent),
     savingsProgress: savingsSaved,
     nonEssentialsRemaining: toMoney(nonEssentialsTarget - nonEssentialsSpent)
+  };
+}
+
+export function validateBudgetPreferenceInput(
+  preference: BudgetPreference
+): BudgetPreferenceValidationResult {
+  const errors: BudgetPreferenceErrors = {};
+  const normalized: BudgetPreference = {
+    essentialsPercent: Number(preference.essentialsPercent),
+    savingsPercent: Number(preference.savingsPercent),
+    nonEssentialsPercent: Number(preference.nonEssentialsPercent)
+  };
+
+  (Object.keys(normalized) as BudgetPreferenceKey[]).forEach((key) => {
+    const value = normalized[key];
+
+    if (!Number.isInteger(value)) {
+      errors[key] = "Use a whole number.";
+    } else if (value < 0 || value > 100) {
+      errors[key] = "Use 0% to 100%.";
+    }
+  });
+
+  const total = getBudgetPreferenceTotal(normalized);
+
+  if (Object.keys(errors).length === 0 && total !== 100) {
+    errors.total = "Targets must total exactly 100%.";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { isValid: false, errors };
+  }
+
+  return { isValid: true, errors: {}, value: normalized };
+}
+
+export function balanceBudgetPreference(
+  preference: BudgetPreference,
+  changedKey: BudgetPreferenceKey,
+  nextValue: number
+): BudgetPreference {
+  const fixedValue = clampPercent(Math.round(nextValue));
+  const otherKeys = (Object.keys(preference) as BudgetPreferenceKey[]).filter(
+    (key) => key !== changedKey
+  );
+  const remaining = 100 - fixedValue;
+  const otherTotal = otherKeys.reduce((total, key) => total + preference[key], 0);
+  const balanced: BudgetPreference = {
+    ...preference,
+    [changedKey]: fixedValue
+  };
+
+  if (otherTotal <= 0) {
+    balanced[otherKeys[0]] = Math.round(remaining / 2);
+    balanced[otherKeys[1]] = remaining - balanced[otherKeys[0]];
+    return balanced;
+  }
+
+  const firstOther = otherKeys[0];
+  const secondOther = otherKeys[1];
+  balanced[firstOther] = Math.round(remaining * (preference[firstOther] / otherTotal));
+  balanced[secondOther] = remaining - balanced[firstOther];
+
+  return balanced;
+}
+
+export function getBudgetPreferenceTotal(preference: BudgetPreference): number {
+  return (
+    preference.essentialsPercent +
+    preference.savingsPercent +
+    preference.nonEssentialsPercent
+  );
+}
+
+export function sortTransactionsForDisplay(
+  transactions: Transaction[],
+  sortOrder: TransactionSortOrder = "newest"
+): Transaction[] {
+  const direction = sortOrder === "newest" ? -1 : 1;
+
+  return [...transactions].sort((first, second) => {
+    const dateComparison = first.date.localeCompare(second.date);
+
+    if (dateComparison !== 0) {
+      return dateComparison * direction;
+    }
+
+    const createdComparison = first.createdAt.localeCompare(second.createdAt);
+
+    if (createdComparison !== 0) {
+      return createdComparison * direction;
+    }
+
+    return first.description.localeCompare(second.description) * direction;
+  });
+}
+
+export function clampTransactionPage(
+  page: number,
+  totalItems: number,
+  pageSize = TRANSACTION_PAGE_SIZE
+): number {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+
+  return Math.min(totalPages, Math.max(1, Math.trunc(page)));
+}
+
+export function paginateTransactions(
+  transactions: Transaction[],
+  page: number,
+  pageSize = TRANSACTION_PAGE_SIZE
+): TransactionPage {
+  const currentPage = clampTransactionPage(page, transactions.length, pageSize);
+  const totalPages = Math.max(1, Math.ceil(transactions.length / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const items = transactions.slice(startIndex, startIndex + pageSize);
+
+  return {
+    items,
+    currentPage,
+    totalPages,
+    totalItems: transactions.length,
+    hasPreviousPage: currentPage > 1,
+    hasNextPage: currentPage < totalPages
   };
 }
 
@@ -333,6 +503,14 @@ function isValidSubcategoryForType(type: TransactionType, subcategory: string): 
   return (transactionSubcategoriesByType[type] ?? []).includes(
     subcategory as TransactionSubcategory
   );
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, value));
 }
 
 function createAnnualMonthReport(

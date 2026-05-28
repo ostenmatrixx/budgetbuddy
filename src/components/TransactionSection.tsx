@@ -1,10 +1,15 @@
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  clampTransactionPage,
   calculateSubcategoryGroups,
   formatCurrency,
   normalizeTransactionSubcategory,
+  paginateTransactions,
+  sortTransactionsForDisplay,
+  TRANSACTION_PAGE_SIZE,
   type CategoryPieSegment,
-  type SubcategoryGroup
+  type SubcategoryGroup,
+  type TransactionSortOrder
 } from "../lib/budget";
 import {
   transactionTypeLabels,
@@ -88,6 +93,7 @@ interface SubcategoryCardProps {
 
 function SubcategoryCard({ group, onDelete, onEdit }: SubcategoryCardProps) {
   const entryLabel = group.transactions.length === 1 ? "entry" : "entries";
+  const listState = usePaginatedTransactionList(group.transactions);
 
   return (
     <div className="rounded-lg border border-light-red/30 bg-light-red/5 p-3">
@@ -106,16 +112,12 @@ function SubcategoryCard({ group, onDelete, onEdit }: SubcategoryCardProps) {
           No entries yet.
         </p>
       ) : (
-        <div className="mt-3 divide-y divide-ecru/70 rounded-lg bg-white/75 px-3">
-          {group.transactions.map((transaction) => (
-            <TransactionRow
-              key={transaction.id}
-              transaction={transaction}
-              onDelete={onDelete}
-              onEdit={onEdit}
-            />
-          ))}
-        </div>
+        <PaginatedTransactionList
+          listState={listState}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          surface="subtle"
+        />
       )}
     </div>
   );
@@ -129,22 +131,147 @@ interface TransactionListProps {
 }
 
 function TransactionList({ emptyLabel, transactions, onDelete, onEdit }: TransactionListProps) {
+  const listState = usePaginatedTransactionList(transactions);
+
   return (
-    <div className="mt-4 divide-y divide-ecru/60">
+    <div className="mt-4">
       {transactions.length === 0 ? (
         <p className="rounded-lg bg-light-red/5 px-3 py-4 text-sm text-black-bean/70">
           No {emptyLabel} entries for this month.
         </p>
       ) : (
-        transactions.map((transaction) => (
+        <PaginatedTransactionList
+          listState={listState}
+          onDelete={onDelete}
+          onEdit={onEdit}
+        />
+      )}
+    </div>
+  );
+}
+
+interface PaginatedListState {
+  page: ReturnType<typeof paginateTransactions>;
+  setPage: (page: number) => void;
+  setSortOrder: (sortOrder: TransactionSortOrder) => void;
+  sortOrder: TransactionSortOrder;
+}
+
+interface PaginatedTransactionListProps {
+  listState: PaginatedListState;
+  onDelete: (transaction: Transaction) => void;
+  onEdit: (transaction: Transaction) => void;
+  surface?: "default" | "subtle";
+}
+
+function PaginatedTransactionList({
+  listState,
+  onDelete,
+  onEdit,
+  surface = "default"
+}: PaginatedTransactionListProps) {
+  const { page, setPage, setSortOrder, sortOrder } = listState;
+  const listClassName =
+    surface === "subtle"
+      ? "mt-3 divide-y divide-ecru/70 rounded-lg bg-white/75 px-3"
+      : "divide-y divide-ecru/60 rounded-lg bg-white";
+
+  return (
+    <div>
+      <TransactionListToolbar sortOrder={sortOrder} onChangeSortOrder={setSortOrder} />
+
+      <div className={`${listClassName} min-h-[22.5rem]`}>
+        {page.items.map((transaction) => (
           <TransactionRow
             key={transaction.id}
             transaction={transaction}
             onDelete={onDelete}
             onEdit={onEdit}
           />
-        ))
-      )}
+        ))}
+      </div>
+
+      {page.totalItems > TRANSACTION_PAGE_SIZE ? (
+        <PaginationFooter
+          currentPage={page.currentPage}
+          hasNextPage={page.hasNextPage}
+          hasPreviousPage={page.hasPreviousPage}
+          totalPages={page.totalPages}
+          onPageChange={setPage}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+interface TransactionListToolbarProps {
+  sortOrder: TransactionSortOrder;
+  onChangeSortOrder: (sortOrder: TransactionSortOrder) => void;
+}
+
+function TransactionListToolbar({
+  sortOrder,
+  onChangeSortOrder
+}: TransactionListToolbarProps) {
+  return (
+    <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+      <span className="font-semibold text-black-bean/55">Sort</span>
+      <div className="grid grid-cols-2 rounded-lg border border-ecru bg-white p-0.5">
+        {(["newest", "oldest"] as const).map((nextSortOrder) => (
+          <button
+            className={`rounded-md px-2 py-1 font-bold transition ${
+              sortOrder === nextSortOrder
+                ? "bg-light-red/25 text-maroon"
+                : "text-black-bean/60 hover:text-maroon"
+            }`}
+            key={nextSortOrder}
+            type="button"
+            onClick={() => onChangeSortOrder(nextSortOrder)}
+          >
+            {nextSortOrder === "newest" ? "Newest" : "Oldest"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface PaginationFooterProps {
+  currentPage: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}
+
+function PaginationFooter({
+  currentPage,
+  hasNextPage,
+  hasPreviousPage,
+  totalPages,
+  onPageChange
+}: PaginationFooterProps) {
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+      <button
+        className="rounded-lg border border-ecru px-3 py-2 font-bold text-black-bean/70 transition hover:border-maroon hover:text-maroon disabled:cursor-not-allowed disabled:opacity-45"
+        type="button"
+        disabled={!hasPreviousPage}
+        onClick={() => onPageChange(currentPage - 1)}
+      >
+        Previous
+      </button>
+      <span className="font-semibold text-black-bean/60">
+        Page {currentPage} of {totalPages}
+      </span>
+      <button
+        className="rounded-lg border border-ecru px-3 py-2 font-bold text-black-bean/70 transition hover:border-maroon hover:text-maroon disabled:cursor-not-allowed disabled:opacity-45"
+        type="button"
+        disabled={!hasNextPage}
+        onClick={() => onPageChange(currentPage + 1)}
+      >
+        Next
+      </button>
     </div>
   );
 }
@@ -157,10 +284,10 @@ interface TransactionRowProps {
 
 function TransactionRow({ transaction, onDelete, onEdit }: TransactionRowProps) {
   return (
-    <article className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="font-semibold">{transaction.description}</p>
-        <p className="mt-1 text-sm text-black-bean/70">
+    <article className="flex min-h-[4.5rem] flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="truncate font-semibold">{transaction.description}</p>
+        <p className="mt-1 truncate text-sm text-black-bean/70">
           {transaction.date}
           {` - ${normalizeTransactionSubcategory(transaction)}`}
           {transaction.notes ? ` - ${transaction.notes}` : ""}
@@ -182,6 +309,35 @@ function TransactionRow({ transaction, onDelete, onEdit }: TransactionRowProps) 
       </div>
     </article>
   );
+}
+
+function usePaginatedTransactionList(transactions: Transaction[]): PaginatedListState {
+  const [sortOrder, setSortOrder] = useState<TransactionSortOrder>("newest");
+  const [currentPage, setCurrentPage] = useState(1);
+  const sortedTransactions = useMemo(
+    () => sortTransactionsForDisplay(transactions, sortOrder),
+    [sortOrder, transactions]
+  );
+  const page = useMemo(
+    () => paginateTransactions(sortedTransactions, currentPage),
+    [currentPage, sortedTransactions]
+  );
+
+  useEffect(() => {
+    setCurrentPage((pageNumber) => clampTransactionPage(pageNumber, sortedTransactions.length));
+  }, [sortedTransactions.length]);
+
+  function handleSortOrderChange(nextSortOrder: TransactionSortOrder) {
+    setSortOrder(nextSortOrder);
+    setCurrentPage(1);
+  }
+
+  return {
+    page,
+    setPage: (pageNumber) => setCurrentPage(pageNumber),
+    setSortOrder: handleSortOrderChange,
+    sortOrder
+  };
 }
 
 interface IconButtonProps {

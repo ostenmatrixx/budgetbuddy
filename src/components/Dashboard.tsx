@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  DEFAULT_BUDGET_PREFERENCES,
   calculateCategoryPieSegments,
   calculateBudgetSummary,
   filterTransactionsByMonth,
-  getMonthName
+  getMonthName,
+  type BudgetPreference
 } from "../lib/budget";
 import {
   addTransaction,
   deleteTransaction,
+  loadBudgetPreference,
   loadTransactions,
+  saveBudgetPreference,
   updateTransaction
 } from "../lib/storage";
 import {
@@ -19,6 +23,7 @@ import {
 } from "../types/transaction";
 import AnnualReportDashboard from "./AnnualReportDashboard";
 import BudgetAllocationCards from "./BudgetAllocationCards";
+import BudgetPreferenceEditor from "./BudgetPreferenceEditor";
 import CalendarWidget from "./CalendarWidget";
 import DailyTransactionLog from "./DailyTransactionLog";
 import DashboardViewToggle, { type DashboardView } from "./DashboardViewToggle";
@@ -45,7 +50,11 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgetPreference, setBudgetPreference] = useState<BudgetPreference>(
+    DEFAULT_BUDGET_PREFERENCES
+  );
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+  const [isSavingBudgetPreference, setIsSavingBudgetPreference] = useState(false);
   const [dataError, setDataError] = useState("");
   const [modalState, setModalState] = useState<ModalState | null>(null);
   const [view, setView] = useState<DashboardView>("monthly");
@@ -58,10 +67,14 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
       setDataError("");
 
       try {
-        const nextTransactions = await loadTransactions(userId);
+        const [nextTransactions, nextBudgetPreference] = await Promise.all([
+          loadTransactions(userId),
+          loadBudgetPreference(userId)
+        ]);
 
         if (isActive) {
           setTransactions(nextTransactions);
+          setBudgetPreference(nextBudgetPreference);
         }
       } catch (error) {
         if (isActive) {
@@ -89,8 +102,8 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
   );
 
   const summary = useMemo(
-    () => calculateBudgetSummary(transactions, selectedYear, selectedMonth),
-    [transactions, selectedMonth, selectedYear]
+    () => calculateBudgetSummary(transactions, selectedYear, selectedMonth, budgetPreference),
+    [budgetPreference, transactions, selectedMonth, selectedYear]
   );
 
   const selectedDateTransactions = useMemo(
@@ -139,6 +152,22 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
       await refreshTransactions();
     } catch (error) {
       setDataError(error instanceof Error ? error.message : "Unable to delete this transaction.");
+    }
+  }
+
+  async function handleSaveBudgetPreference(nextPreference: BudgetPreference) {
+    setDataError("");
+    setIsSavingBudgetPreference(true);
+
+    try {
+      const savedPreference = await saveBudgetPreference(userId, nextPreference);
+      setBudgetPreference(savedPreference);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to save budget targets.";
+      setDataError(message);
+      throw new Error(message);
+    } finally {
+      setIsSavingBudgetPreference(false);
     }
   }
 
@@ -207,7 +236,12 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
                   onChange={handleMonthChange}
                 />
                 <SummaryCards summary={summary} />
-                <BudgetAllocationCards summary={summary} />
+                <BudgetPreferenceEditor
+                  isSaving={isSavingBudgetPreference}
+                  preference={budgetPreference}
+                  onSave={handleSaveBudgetPreference}
+                />
+                <BudgetAllocationCards preference={budgetPreference} summary={summary} />
               </div>
               <div className="flex flex-col gap-4">
                 <CalendarWidget

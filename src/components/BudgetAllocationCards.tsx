@@ -1,27 +1,36 @@
-import { formatCurrency, progressPercent, type BudgetSummary } from "../lib/budget";
+import {
+  formatCurrency,
+  progressPercent,
+  type BudgetPreference,
+  type BudgetSummary
+} from "../lib/budget";
 
 interface BudgetAllocationCardsProps {
+  preference: BudgetPreference;
   summary: BudgetSummary;
 }
 
-export default function BudgetAllocationCards({ summary }: BudgetAllocationCardsProps) {
+export default function BudgetAllocationCards({
+  preference,
+  summary
+}: BudgetAllocationCardsProps) {
   const cards = [
     {
-      label: "50% Essentials",
+      label: `${preference.essentialsPercent}% Essentials`,
       target: summary.essentialsTarget,
       actual: summary.billsSpent,
       remainingLabel: "Essentials remaining",
       remaining: summary.essentialsRemaining
     },
     {
-      label: "30% Savings",
+      label: `${preference.savingsPercent}% Savings`,
       target: summary.savingsTarget,
       actual: summary.savingsSaved,
       remainingLabel: "Savings to target",
       remaining: summary.savingsTarget - summary.savingsSaved
     },
     {
-      label: "20% Non-Essentials",
+      label: `${preference.nonEssentialsPercent}% Non-Essentials`,
       target: summary.nonEssentialsTarget,
       actual: summary.nonEssentialsSpent,
       remainingLabel: "Non-essentials remaining",
@@ -30,7 +39,7 @@ export default function BudgetAllocationCards({ summary }: BudgetAllocationCards
   ];
 
   return (
-    <section className="grid gap-3 xl:grid-cols-3" aria-label="50 30 20 budget targets">
+    <section className="grid gap-3 xl:grid-cols-3" aria-label="Budget targets">
       {cards.map((card) => {
         const isOver = card.remaining < 0;
         const percent = progressPercent(card.actual, card.target);

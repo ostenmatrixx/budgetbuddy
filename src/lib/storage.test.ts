@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_BUDGET_PREFERENCES,
+  budgetPreferenceRowToPreference,
+  budgetPreferenceToPayload,
   draftToInsertPayload,
   draftToUpdatePayload,
   rowToTransaction,
+  type BudgetPreferenceRow,
   type TransactionRow
 } from "./storage";
 import type { TransactionDraft } from "../types/transaction";
@@ -27,6 +31,15 @@ const draft: TransactionDraft = {
   date: "2026-05-20",
   description: "Emergency transfer",
   notes: "Payday"
+};
+
+const preferenceRow: BudgetPreferenceRow = {
+  user_id: "f6eb4d75-cf59-4e31-8939-d086d9d8ef9d",
+  essentials_percent: 60,
+  savings_percent: 20,
+  non_essentials_percent: 20,
+  created_at: "2026-05-18T00:00:00.000Z",
+  updated_at: "2026-05-19T00:00:00.000Z"
 };
 
 describe("Supabase transaction mapping", () => {
@@ -71,6 +84,35 @@ describe("Supabase transaction mapping", () => {
       date: "2026-05-20",
       description: "Emergency transfer",
       notes: ""
+    });
+  });
+});
+
+describe("Supabase budget preference mapping", () => {
+  it("maps preference rows to app preferences", () => {
+    expect(budgetPreferenceRowToPreference(preferenceRow)).toEqual({
+      essentialsPercent: 60,
+      savingsPercent: 20,
+      nonEssentialsPercent: 20
+    });
+  });
+
+  it("maps missing preference rows to the default allocation", () => {
+    expect(budgetPreferenceRowToPreference(null)).toEqual(DEFAULT_BUDGET_PREFERENCES);
+  });
+
+  it("maps app preferences to an upsert payload", () => {
+    expect(
+      budgetPreferenceToPayload("f6eb4d75-cf59-4e31-8939-d086d9d8ef9d", {
+        essentialsPercent: 60,
+        savingsPercent: 20,
+        nonEssentialsPercent: 20
+      })
+    ).toMatchObject({
+      user_id: "f6eb4d75-cf59-4e31-8939-d086d9d8ef9d",
+      essentials_percent: 60,
+      savings_percent: 20,
+      non_essentials_percent: 20
     });
   });
 });

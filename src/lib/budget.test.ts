@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_BUDGET_PREFERENCES,
+  balanceBudgetPreference,
   calculateAnnualReport,
   calculateBudgetSummary,
   calculateCategoryPieSegments,
   calculateSubcategoryGroups,
+  clampTransactionPage,
   filterTransactionsByMonth,
   formatCurrency,
   normalizeTransactionSubcategory,
+  paginateTransactions,
+  sortTransactionsForDisplay,
+  validateBudgetPreferenceInput,
   validateTransactionInput
 } from "./budget";
 import type { Transaction } from "../types/transaction";
@@ -142,6 +148,79 @@ describe("calculateBudgetSummary", () => {
     expect(result.essentialsRemaining).toBe(13000);
     expect(result.savingsProgress).toBe(15000);
     expect(result.nonEssentialsRemaining).toBe(6000);
+  });
+
+  it("calculates budget targets from custom allocation preferences", () => {
+    const result = calculateBudgetSummary(transactions, 2026, 5, {
+      essentialsPercent: 60,
+      savingsPercent: 20,
+      nonEssentialsPercent: 20
+    });
+
+    expect(result.essentialsTarget).toBe(30000);
+    expect(result.savingsTarget).toBe(10000);
+    expect(result.nonEssentialsTarget).toBe(10000);
+    expect(result.essentialsRemaining).toBe(18000);
+    expect(result.nonEssentialsRemaining).toBe(6000);
+  });
+});
+
+describe("budget preferences", () => {
+  it("uses a 50/30/20 default allocation", () => {
+    expect(DEFAULT_BUDGET_PREFERENCES).toEqual({
+      essentialsPercent: 50,
+      savingsPercent: 30,
+      nonEssentialsPercent: 20
+    });
+  });
+
+  it("validates whole-number percentages that total 100", () => {
+    expect(
+      validateBudgetPreferenceInput({
+        essentialsPercent: 60,
+        savingsPercent: 20,
+        nonEssentialsPercent: 20
+      })
+    ).toEqual({
+      isValid: true,
+      errors: {},
+      value: {
+        essentialsPercent: 60,
+        savingsPercent: 20,
+        nonEssentialsPercent: 20
+      }
+    });
+
+    expect(
+      validateBudgetPreferenceInput({
+        essentialsPercent: 60,
+        savingsPercent: 25,
+        nonEssentialsPercent: 20
+      })
+    ).toMatchObject({
+      isValid: false,
+      errors: {
+        total: "Targets must total exactly 100%."
+      }
+    });
+  });
+
+  it("balances the two other categories proportionally and keeps the total at 100", () => {
+    expect(
+      balanceBudgetPreference(
+        {
+          essentialsPercent: 50,
+          savingsPercent: 30,
+          nonEssentialsPercent: 20
+        },
+        "essentialsPercent",
+        60
+      )
+    ).toEqual({
+      essentialsPercent: 60,
+      savingsPercent: 24,
+      nonEssentialsPercent: 16
+    });
   });
 });
 
@@ -375,6 +454,116 @@ describe("subcategory helpers", () => {
   it("returns no subcategory groups for categories without subcategories", () => {
     expect(calculateSubcategoryGroups(transactions, 2026, 5, "income")).toEqual([]);
     expect(calculateSubcategoryGroups(transactions, 2026, 5, "non_essentials")).toEqual([]);
+  });
+});
+
+describe("transaction list pagination", () => {
+  const paginatedTransactions: Transaction[] = [
+    {
+      id: "1",
+      type: "income",
+      amount: 1000,
+      date: "2026-05-01",
+      description: "One",
+      notes: "",
+      createdAt: "2026-05-01T09:00:00.000Z",
+      updatedAt: "2026-05-01T09:00:00.000Z"
+    },
+    {
+      id: "2",
+      type: "income",
+      amount: 1000,
+      date: "2026-05-02",
+      description: "Two",
+      notes: "",
+      createdAt: "2026-05-02T09:00:00.000Z",
+      updatedAt: "2026-05-02T09:00:00.000Z"
+    },
+    {
+      id: "3",
+      type: "income",
+      amount: 1000,
+      date: "2026-05-02",
+      description: "Three",
+      notes: "",
+      createdAt: "2026-05-02T10:00:00.000Z",
+      updatedAt: "2026-05-02T10:00:00.000Z"
+    },
+    {
+      id: "4",
+      type: "income",
+      amount: 1000,
+      date: "2026-05-03",
+      description: "Four",
+      notes: "",
+      createdAt: "2026-05-03T09:00:00.000Z",
+      updatedAt: "2026-05-03T09:00:00.000Z"
+    },
+    {
+      id: "5",
+      type: "income",
+      amount: 1000,
+      date: "2026-05-04",
+      description: "Five",
+      notes: "",
+      createdAt: "2026-05-04T09:00:00.000Z",
+      updatedAt: "2026-05-04T09:00:00.000Z"
+    },
+    {
+      id: "6",
+      type: "income",
+      amount: 1000,
+      date: "2026-05-05",
+      description: "Six",
+      notes: "",
+      createdAt: "2026-05-05T09:00:00.000Z",
+      updatedAt: "2026-05-05T09:00:00.000Z"
+    }
+  ];
+
+  it("sorts newest transactions by date descending and created date descending", () => {
+    expect(sortTransactionsForDisplay(paginatedTransactions, "newest").map(({ id }) => id)).toEqual([
+      "6",
+      "5",
+      "4",
+      "3",
+      "2",
+      "1"
+    ]);
+  });
+
+  it("sorts oldest transactions by date ascending and created date ascending", () => {
+    expect(sortTransactionsForDisplay(paginatedTransactions, "oldest").map(({ id }) => id)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ]);
+  });
+
+  it("paginates transactions to five items per page", () => {
+    const result = paginateTransactions(paginatedTransactions, 1);
+
+    expect(result.items).toHaveLength(5);
+    expect(result.items.map(({ id }) => id)).toEqual(["1", "2", "3", "4", "5"]);
+    expect(result.totalPages).toBe(2);
+    expect(result.hasNextPage).toBe(true);
+  });
+
+  it("clamps pages after the item count changes", () => {
+    expect(clampTransactionPage(3, 6)).toBe(2);
+    expect(clampTransactionPage(2, 4)).toBe(1);
+    expect(clampTransactionPage(0, 6)).toBe(1);
+  });
+
+  it("keeps summary totals based on all transactions, not just visible rows", () => {
+    const result = calculateBudgetSummary(paginatedTransactions, 2026, 5);
+    const page = paginateTransactions(paginatedTransactions, 1);
+
+    expect(page.items).toHaveLength(5);
+    expect(result.totalIncome).toBe(6000);
   });
 });
 

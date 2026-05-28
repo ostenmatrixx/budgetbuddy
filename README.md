@@ -16,6 +16,7 @@ A simple personal budget tracker built with Vite, React, TypeScript, Tailwind CS
 - Daily log with edit and delete controls
 - PHP currency formatting by default
 - Supabase persistence with row-level security
+- Per-account editable budget target split, defaulting to 50/30/20
 
 ## Important Security Note
 
@@ -107,9 +108,9 @@ The included `vercel.json` sets:
 
 ## Data Storage
 
-Transactions are stored in Supabase in `public.transactions`. Row-level security limits each authenticated user to their own rows.
+Transactions are stored in Supabase in `public.transactions`. Budget target settings are stored in `public.budget_preferences`. Row-level security limits each authenticated user to their own rows.
 
-The table and RLS setup SQL is checked in at `supabase/migrations/20260528000000_create_transactions.sql`. Apply that SQL to the `supabase-budget-tracker` project before using the app. Existing browser `localStorage` data from older versions is left untouched but is no longer used.
+The table and RLS setup SQL is checked in under `supabase/migrations/`. Apply those SQL files to the `supabase-budget-tracker` project before using the app. Existing browser `localStorage` data from older versions is left untouched but is no longer used.
 
 Users can create an account from the app with email/password. If email confirmation is enabled in Supabase Auth, new users will need to confirm their email before signing in.
 
