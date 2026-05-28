@@ -1,122 +1,145 @@
-import {
-  transactionTypes,
-  type Transaction,
-  type TransactionDraft,
-  type TransactionType
+import { getSupabaseClient } from "./supabaseClient";
+import type {
+  Transaction,
+  TransactionDraft,
+  TransactionSubcategory,
+  TransactionType
 } from "../types/transaction";
 
-export const STORAGE_KEY = "budget-tracker-transactions";
-
-export function loadTransactions(): Transaction[] {
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter(isTransaction);
-  } catch {
-    return [];
-  }
+export interface TransactionRow {
+  id: string;
+  user_id: string;
+  type: TransactionType;
+  subcategory: TransactionSubcategory | null;
+  amount: number | string;
+  date: string;
+  description: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-export function saveTransactions(transactions: Transaction[]): void {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+export interface TransactionInsertPayload {
+  user_id: string;
+  type: TransactionType;
+  subcategory: TransactionSubcategory | null;
+  amount: number;
+  date: string;
+  description: string;
+  notes: string;
 }
 
-export function addTransaction(draft: TransactionDraft): Transaction {
-  const timestamp = new Date().toISOString();
-  const transaction: Transaction = {
-    id: createId(),
-    ...draft,
-    createdAt: timestamp,
-    updatedAt: timestamp
+export interface TransactionUpdatePayload {
+  type: TransactionType;
+  subcategory: TransactionSubcategory | null;
+  amount: number;
+  date: string;
+  description: string;
+  notes: string;
+  updated_at: string;
+}
+
+const tableName = "transactions";
+
+export function rowToTransaction(row: TransactionRow): Transaction {
+  return {
+    id: row.id,
+    type: row.type,
+    subcategory: row.subcategory ?? undefined,
+    amount: Number(row.amount),
+    date: row.date,
+    description: row.description,
+    notes: row.notes ?? "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
-
-  saveTransactions([...loadTransactions(), transaction]);
-  return transaction;
 }
 
-export function updateTransaction(
+export function draftToInsertPayload(
+  userId: string,
+  draft: TransactionDraft
+): TransactionInsertPayload {
+  return {
+    user_id: userId,
+    type: draft.type,
+    subcategory: draft.subcategory ?? null,
+    amount: draft.amount,
+    date: draft.date,
+    description: draft.description,
+    notes: draft.notes
+  };
+}
+
+export function draftToUpdatePayload(draft: TransactionDraft): TransactionUpdatePayload {
+  return {
+    type: draft.type,
+    subcategory: draft.subcategory ?? null,
+    amount: draft.amount,
+    date: draft.date,
+    description: draft.description,
+    notes: draft.notes,
+    updated_at: new Date().toISOString()
+  };
+}
+
+export async function loadTransactions(userId: string): Promise<Transaction[]> {
+  const { data, error } = await getSupabaseClient()
+    .from(tableName)
+    .select("*")
+    .eq("user_id", userId)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as TransactionRow[]).map(rowToTransaction);
+}
+
+export async function addTransaction(
+  userId: string,
+  draft: TransactionDraft
+): Promise<Transaction> {
+  const { data, error } = await getSupabaseClient()
+    .from(tableName)
+    .insert(draftToInsertPayload(userId, draft))
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return rowToTransaction(data as TransactionRow);
+}
+
+export async function updateTransaction(
+  userId: string,
   id: string,
   draft: TransactionDraft
-): Transaction | undefined {
-  const transactions = loadTransactions();
-  const current = transactions.find((transaction) => transaction.id === id);
+): Promise<Transaction | undefined> {
+  const { data, error } = await getSupabaseClient()
+    .from(tableName)
+    .update(draftToUpdatePayload(draft))
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
 
-  if (!current) {
-    return undefined;
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const updated: Transaction = {
-    ...current,
-    ...draft,
-    updatedAt: nextTimestamp(current.updatedAt)
-  };
-
-  saveTransactions(
-    transactions.map((transaction) => (transaction.id === id ? updated : transaction))
-  );
-
-  return updated;
+  return data ? rowToTransaction(data as TransactionRow) : undefined;
 }
 
-export function deleteTransaction(id: string): boolean {
-  const transactions = loadTransactions();
-  const nextTransactions = transactions.filter((transaction) => transaction.id !== id);
+export async function deleteTransaction(id: string): Promise<boolean> {
+  const { error } = await getSupabaseClient().from(tableName).delete().eq("id", id);
 
-  if (nextTransactions.length === transactions.length) {
-    return false;
+  if (error) {
+    throw new Error(error.message);
   }
 
-  saveTransactions(nextTransactions);
   return true;
-}
-
-function isTransaction(value: unknown): value is Transaction {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const transaction = value as Transaction;
-  return (
-    typeof transaction.id === "string" &&
-    isTransactionType(transaction.type) &&
-    typeof transaction.amount === "number" &&
-    Number.isFinite(transaction.amount) &&
-    typeof transaction.date === "string" &&
-    typeof transaction.description === "string" &&
-    typeof transaction.notes === "string" &&
-    (transaction.subcategory === undefined || typeof transaction.subcategory === "string") &&
-    typeof transaction.createdAt === "string" &&
-    typeof transaction.updatedAt === "string"
-  );
-}
-
-function isTransactionType(value: unknown): value is TransactionType {
-  return typeof value === "string" && transactionTypes.includes(value as TransactionType);
-}
-
-function createId(): string {
-  if ("crypto" in window && typeof window.crypto.randomUUID === "function") {
-    return window.crypto.randomUUID();
-  }
-
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function nextTimestamp(previousTimestamp: string): string {
-  const timestamp = new Date().toISOString();
-
-  if (timestamp !== previousTimestamp) {
-    return timestamp;
-  }
-
-  return new Date(new Date(timestamp).getTime() + 1).toISOString();
 }

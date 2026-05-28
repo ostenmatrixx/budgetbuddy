@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   calculateCategoryPieSegments,
   calculateBudgetSummary,
@@ -28,7 +28,9 @@ import TransactionFormModal from "./TransactionFormModal";
 import TransactionSection from "./TransactionSection";
 
 interface DashboardProps {
-  onLogout: () => void;
+  userId: string;
+  userEmail?: string;
+  onLogout: () => void | Promise<void>;
 }
 
 interface ModalState {
@@ -37,14 +39,49 @@ interface ModalState {
   date?: string;
 }
 
-export default function Dashboard({ onLogout }: DashboardProps) {
+export default function Dashboard({ userId, userEmail, onLogout }: DashboardProps) {
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
-  const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+  const [dataError, setDataError] = useState("");
   const [modalState, setModalState] = useState<ModalState | null>(null);
   const [view, setView] = useState<DashboardView>("monthly");
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function fetchTransactions() {
+      setIsLoadingTransactions(true);
+      setDataError("");
+
+      try {
+        const nextTransactions = await loadTransactions(userId);
+
+        if (isActive) {
+          setTransactions(nextTransactions);
+        }
+      } catch (error) {
+        if (isActive) {
+          setDataError(
+            error instanceof Error ? error.message : "Unable to load your transactions."
+          );
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingTransactions(false);
+        }
+      }
+    }
+
+    void fetchTransactions();
+
+    return () => {
+      isActive = false;
+    };
+  }, [userId]);
 
   const monthlyTransactions = useMemo(
     () => filterTransactionsByMonth(transactions, selectedYear, selectedMonth),
@@ -66,30 +103,43 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     [selectedDate, transactions]
   );
 
-  function refreshTransactions() {
-    setTransactions(loadTransactions());
+  async function refreshTransactions() {
+    const nextTransactions = await loadTransactions(userId);
+    setTransactions(nextTransactions);
   }
 
-  function handleSaveTransaction(draft: TransactionDraft) {
-    if (modalState?.transaction) {
-      updateTransaction(modalState.transaction.id, draft);
-    } else {
-      addTransaction(draft);
+  async function handleSaveTransaction(draft: TransactionDraft) {
+    setDataError("");
+
+    try {
+      if (modalState?.transaction) {
+        await updateTransaction(userId, modalState.transaction.id, draft);
+      } else {
+        await addTransaction(userId, draft);
+      }
+
+      await refreshTransactions();
+      setModalState(null);
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : "Unable to save this transaction.");
     }
-
-    refreshTransactions();
-    setModalState(null);
   }
 
-  function handleDeleteTransaction(transaction: Transaction) {
+  async function handleDeleteTransaction(transaction: Transaction) {
     const confirmed = window.confirm(`Delete "${transaction.description}"?`);
 
     if (!confirmed) {
       return;
     }
 
-    deleteTransaction(transaction.id);
-    refreshTransactions();
+    setDataError("");
+
+    try {
+      await deleteTransaction(transaction.id);
+      await refreshTransactions();
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : "Unable to delete this transaction.");
+    }
   }
 
   function handleMonthChange(year: number, month: number) {
@@ -120,6 +170,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           </div>
           <div className="flex flex-col gap-3 sm:items-end">
             <DashboardViewToggle view={view} onChange={handleViewChange} />
+            {userEmail ? (
+              <p className="max-w-[260px] truncate text-sm font-medium text-black-bean/60">
+                {userEmail}
+              </p>
+            ) : null}
             <button
               className="w-fit rounded-lg border border-maroon/60 bg-white px-4 py-2 text-sm font-bold text-maroon shadow-sm transition hover:bg-maroon hover:text-white focus:outline-none focus:ring-2 focus:ring-maroon/30"
               type="button"
@@ -130,7 +185,19 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           </div>
         </header>
 
-        {view === "monthly" ? (
+        {dataError ? (
+          <div className="rounded-lg border border-light-red/50 bg-light-red/15 px-4 py-3 text-sm font-semibold text-maroon">
+            {dataError}
+          </div>
+        ) : null}
+
+        {isLoadingTransactions ? (
+          <section className="rounded-lg border border-light-red/30 bg-white p-6 text-sm font-semibold text-black-bean/65 shadow-[0_20px_60px_rgba(166,66,66,0.08)]">
+            Loading transactions...
+          </section>
+        ) : null}
+
+        {!isLoadingTransactions && view === "monthly" ? (
           <>
             <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div className="flex flex-col gap-5">
@@ -185,7 +252,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               ))}
             </section>
           </>
-        ) : (
+        ) : null}
+
+        {!isLoadingTransactions && view === "annual" ? (
           <AnnualReportDashboard
             transactions={transactions}
             year={selectedYear}
@@ -194,7 +263,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               setSelectedDate(undefined);
             }}
           />
-        )}
+        ) : null}
       </div>
 
       {modalState ? (

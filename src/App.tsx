@@ -1,38 +1,65 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import Dashboard from "./components/Dashboard";
 import LoginScreen from "./components/LoginScreen";
-
-const SESSION_KEY = "budget-tracker-admin-session";
+import { getSupabaseClient } from "./lib/supabaseClient";
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    () => window.sessionStorage.getItem(SESSION_KEY) === "active"
-  );
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [configurationError, setConfigurationError] = useState("");
 
-  function handleLogin(password: string): string | undefined {
-    const adminPassword = import.meta.env.ADMIN_PASSWORD?.trim();
+  useEffect(() => {
+    try {
+      const supabase = getSupabaseClient();
 
-    if (!adminPassword) {
-      return "ADMIN_PASSWORD is not configured for this app.";
+      supabase.auth
+        .getSession()
+        .then(({ data, error }) => {
+          if (error) {
+            setConfigurationError(error.message);
+            return;
+          }
+
+          setSession(data.session);
+        })
+        .catch((error: unknown) => {
+          setConfigurationError(error instanceof Error ? error.message : "Unable to load session.");
+        })
+        .finally(() => setIsLoadingSession(false));
+
+      const {
+        data: { subscription }
+      } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        setSession(nextSession);
+      });
+
+      return () => subscription.unsubscribe();
+    } catch (error) {
+      setConfigurationError(
+        error instanceof Error ? error.message : "Supabase is not configured correctly."
+      );
+      setIsLoadingSession(false);
     }
+  }, []);
 
-    if (password !== adminPassword) {
-      return "That password does not match.";
-    }
-
-    window.sessionStorage.setItem(SESSION_KEY, "active");
-    setIsAuthenticated(true);
-    return undefined;
+  async function handleLogout() {
+    await getSupabaseClient().auth.signOut();
   }
 
-  function handleLogout() {
-    window.sessionStorage.removeItem(SESSION_KEY);
-    setIsAuthenticated(false);
+  if (isLoadingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-white px-4 text-black-bean">
+        <div className="rounded-lg border border-light-red/30 bg-white px-5 py-4 text-sm font-semibold shadow-[0_20px_60px_rgba(166,66,66,0.12)]">
+          Loading your budget...
+        </div>
+      </main>
+    );
   }
 
-  return isAuthenticated ? (
-    <Dashboard onLogout={handleLogout} />
+  return session ? (
+    <Dashboard userId={session.user.id} userEmail={session.user.email} onLogout={handleLogout} />
   ) : (
-    <LoginScreen onLogin={handleLogin} />
+    <LoginScreen configurationError={configurationError} />
   );
 }
