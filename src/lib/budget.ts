@@ -374,21 +374,32 @@ export function calculateSubcategoryGroups(
   const categoryTransactions = filterTransactionsByMonth(transactions, year, month).filter(
     (transaction) => transaction.type === type
   );
-  const groupLabels = [
-    UNCATEGORIZED_SUBCATEGORY_LABEL,
-    ...getActiveSubcategoryNames(subcategoriesByType, type)
-  ];
+  const groupLabels = getActiveSubcategoryNames(subcategoriesByType, type);
   const labelKeys = new Set(groupLabels.map(createSubcategoryKey));
+  let hasUncategorizedTransactions = false;
 
   categoryTransactions.forEach((transaction) => {
     const label = normalizeTransactionSubcategory(transaction);
     const key = createSubcategoryKey(label);
+
+    if (key === createSubcategoryKey(UNCATEGORIZED_SUBCATEGORY_LABEL)) {
+      hasUncategorizedTransactions = true;
+      return;
+    }
 
     if (!labelKeys.has(key)) {
       labelKeys.add(key);
       groupLabels.push(label);
     }
   });
+
+  if (hasUncategorizedTransactions) {
+    groupLabels.unshift(UNCATEGORIZED_SUBCATEGORY_LABEL);
+  }
+
+  if (groupLabels.length === 0) {
+    groupLabels.push(UNCATEGORIZED_SUBCATEGORY_LABEL);
+  }
 
   return groupLabels.map((label) => {
     const groupTransactions = categoryTransactions.filter(

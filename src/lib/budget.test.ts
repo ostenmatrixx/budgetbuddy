@@ -498,6 +498,42 @@ describe("subcategory helpers", () => {
     ]);
   });
 
+  it("omits the uncategorized group when there are no uncategorized entries", () => {
+    const result = calculateSubcategoryGroups(
+      [
+        {
+          id: "custom-1",
+          type: "bills",
+          subcategory: "Utilities",
+          amount: 2500,
+          date: "2026-05-08",
+          description: "Power bill",
+          notes: "",
+          createdAt: "2026-05-08T00:00:00.000Z",
+          updatedAt: "2026-05-08T00:00:00.000Z"
+        }
+      ],
+      2026,
+      5,
+      "bills",
+      subcategoriesByType
+    );
+
+    expect(result.map((group) => group.label)).toEqual(["Utilities", "Rent"]);
+  });
+
+  it("keeps one empty uncategorized group as the fallback empty state", () => {
+    const result = calculateSubcategoryGroups([], 2026, 5, "income", {});
+
+    expect(result).toEqual([
+      {
+        label: "Uncategorized",
+        total: 0,
+        transactions: []
+      }
+    ]);
+  });
+
   it("keeps a valid selected subcategory and falls back when it is unavailable", () => {
     const groups = calculateSubcategoryGroups(
       transactions,

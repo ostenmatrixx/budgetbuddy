@@ -114,7 +114,7 @@ export default function TransactionFormModal({
             {errors.type ? <span className="mt-1 block text-xs text-maroon">{errors.type}</span> : null}
           </label>
 
-          {selectedType && subcategories.length > 0 ? (
+          {selectedType ? (
             <label className="text-sm font-semibold">
               Subcategory <span className="font-normal text-black-bean/50">(optional)</span>
               <select
@@ -128,6 +128,11 @@ export default function TransactionFormModal({
                     {subcategory}
                   </option>
                 ))}
+                {subcategories.length === 0 ? (
+                  <option disabled value="__none">
+                    No saved subcategories yet
+                  </option>
+                ) : null}
               </select>
               {errors.subcategory ? (
                 <span className="mt-1 block text-xs text-maroon">{errors.subcategory}</span>
