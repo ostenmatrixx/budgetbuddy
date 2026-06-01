@@ -1,19 +1,25 @@
 import { type FormEvent, useState } from "react";
-import { normalizeTransactionSubcategory, validateTransactionInput } from "../lib/budget";
 import {
-  transactionSubcategoriesByType,
+  getActiveSubcategoryNames,
+  normalizeSubcategoryLabel,
+  validateTransactionInput
+} from "../lib/budget";
+import {
   transactionTypeShortLabels,
   transactionTypes,
   type Transaction,
   type TransactionDraft,
   type TransactionErrors,
   type TransactionFormValues,
+  type TransactionSubcategoriesByType,
+  type TransactionSubcategoryOption,
   type TransactionType
 } from "../types/transaction";
 
 interface TransactionFormModalProps {
   defaultDate?: string;
   initialType?: TransactionType;
+  subcategoriesByType: TransactionSubcategoriesByType;
   transaction?: Transaction;
   onClose: () => void;
   onSubmit: (draft: TransactionDraft) => void;
@@ -22,14 +28,12 @@ interface TransactionFormModalProps {
 export default function TransactionFormModal({
   defaultDate,
   initialType,
+  subcategoriesByType,
   transaction,
   onClose,
   onSubmit
 }: TransactionFormModalProps) {
-  const initialSubcategory =
-    transaction && transactionSubcategoriesByType[transaction.type]
-      ? normalizeTransactionSubcategory(transaction)
-      : "";
+  const initialSubcategory = normalizeSubcategoryLabel(transaction?.subcategory);
   const [values, setValues] = useState<TransactionFormValues>(() => ({
     type: transaction?.type ?? initialType ?? "",
     subcategory: initialSubcategory,
@@ -52,7 +56,7 @@ export default function TransactionFormModal({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = validateTransactionInput(values);
+    const result = validateTransactionInput(values, validationSubcategoriesByType);
 
     if (!result.isValid || !result.value) {
       setErrors(result.errors);
@@ -63,7 +67,12 @@ export default function TransactionFormModal({
   }
 
   const selectedType = transactionTypes.find((type) => type === values.type);
-  const subcategories = selectedType ? transactionSubcategoriesByType[selectedType] : undefined;
+  const subcategories = selectedType
+    ? getFormSubcategoryNames(subcategoriesByType, selectedType, transaction)
+    : [];
+  const validationSubcategoriesByType = selectedType
+    ? getValidationSubcategoriesByType(subcategoriesByType, selectedType, transaction)
+    : subcategoriesByType;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black-bean/45 px-3 py-4 sm:items-center sm:justify-center">
@@ -105,15 +114,15 @@ export default function TransactionFormModal({
             {errors.type ? <span className="mt-1 block text-xs text-maroon">{errors.type}</span> : null}
           </label>
 
-          {subcategories ? (
+          {selectedType && subcategories.length > 0 ? (
             <label className="text-sm font-semibold">
-              Subcategory
+              Subcategory <span className="font-normal text-black-bean/50">(optional)</span>
               <select
                 className="mt-2 w-full rounded-lg border border-ecru bg-white/70 px-3 py-2 outline-none transition focus:border-maroon focus:ring-2 focus:ring-maroon/20"
                 value={values.subcategory ?? ""}
                 onChange={(event) => updateValue("subcategory", event.target.value)}
               >
-                <option value="">Choose subcategory</option>
+                <option value="">No subcategory</option>
                 {subcategories.map((subcategory) => (
                   <option key={subcategory} value={subcategory}>
                     {subcategory}
@@ -193,4 +202,60 @@ export default function TransactionFormModal({
       </form>
     </div>
   );
+}
+
+function getFormSubcategoryNames(
+  subcategoriesByType: TransactionSubcategoriesByType,
+  type: TransactionType,
+  transaction?: Transaction
+): string[] {
+  const activeNames = getActiveSubcategoryNames(subcategoriesByType, type);
+  const currentName =
+    transaction?.type === type ? normalizeSubcategoryLabel(transaction.subcategory) : "";
+  const hasCurrentName =
+    currentName &&
+    !activeNames.some(
+      (name) => normalizeSubcategoryLabel(name).toLocaleLowerCase() ===
+        currentName.toLocaleLowerCase()
+    );
+
+  return hasCurrentName ? [...activeNames, currentName] : activeNames;
+}
+
+function getValidationSubcategoriesByType(
+  subcategoriesByType: TransactionSubcategoriesByType,
+  type: TransactionType,
+  transaction?: Transaction
+): TransactionSubcategoriesByType {
+  const currentName =
+    transaction?.type === type ? normalizeSubcategoryLabel(transaction.subcategory) : "";
+
+  if (!currentName) {
+    return subcategoriesByType;
+  }
+
+  const alreadyAvailable = (subcategoriesByType[type] ?? []).some(
+    (subcategory) =>
+      subcategory.isActive &&
+      normalizeSubcategoryLabel(subcategory.name).toLocaleLowerCase() ===
+        currentName.toLocaleLowerCase()
+  );
+
+  if (alreadyAvailable) {
+    return subcategoriesByType;
+  }
+
+  const currentOption: TransactionSubcategoryOption = {
+    id: `current-${type}-${currentName}`,
+    type,
+    name: currentName,
+    isActive: true,
+    createdAt: transaction?.createdAt ?? "",
+    updatedAt: transaction?.updatedAt ?? ""
+  };
+
+  return {
+    ...subcategoriesByType,
+    [type]: [...(subcategoriesByType[type] ?? []), currentOption]
+  };
 }

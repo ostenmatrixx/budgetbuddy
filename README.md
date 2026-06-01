@@ -8,7 +8,7 @@ A simple personal budget tracker built with Vite, React, TypeScript, Tailwind CS
 - One dashboard for monthly income, essentials, non-essential spending, and savings
 - 50/30/20 budget targets with progress bars
 - CRUD for every transaction category
-- Essentials and savings subcategories
+- Per-account subcategories for income, essentials, savings, and non-essentials
 - Category pie charts on monthly cards
 - Month and year selector
 - Annual report dashboard with bar graphs
@@ -17,6 +17,7 @@ A simple personal budget tracker built with Vite, React, TypeScript, Tailwind CS
 - PHP currency formatting by default
 - Supabase persistence with row-level security
 - Per-account editable budget target split, defaulting to 50/30/20
+- Per-card subcategory management with archive-safe history
 
 ## Important Security Note
 
@@ -108,9 +109,11 @@ The included `vercel.json` sets:
 
 ## Data Storage
 
-Transactions are stored in Supabase in `public.transactions`. Budget target settings are stored in `public.budget_preferences`. Row-level security limits each authenticated user to their own rows.
+Transactions are stored in Supabase in `public.transactions`. Budget target settings are stored in `public.budget_preferences`. User-managed subcategories are stored in `public.transaction_subcategories`. Row-level security limits each authenticated user to their own rows.
 
 The table and RLS setup SQL is checked in under `supabase/migrations/`. Apply those SQL files to the `supabase-budget-tracker` project before using the app. Existing browser `localStorage` data from older versions is left untouched but is no longer used.
+
+Subcategories start empty for each account. Use the `Manage` button on any category card to add active subcategories. Archiving a subcategory removes it from future forms, but existing transactions using that label remain visible in the dashboard.
 
 Users can create an account from the app with email/password. If email confirmation is enabled in Supabase Auth, new users will need to confirm their email before signing in.
 

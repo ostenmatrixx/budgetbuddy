@@ -8,9 +8,12 @@ import {
   type BudgetPreference
 } from "../lib/budget";
 import {
+  addTransactionSubcategory,
+  archiveTransactionSubcategory,
   addTransaction,
   deleteTransaction,
   loadBudgetPreference,
+  loadTransactionSubcategories,
   loadTransactions,
   saveBudgetPreference,
   updateTransaction
@@ -19,6 +22,8 @@ import {
   transactionTypes,
   type Transaction,
   type TransactionDraft,
+  type TransactionSubcategoriesByType,
+  type TransactionSubcategoryOption,
   type TransactionType
 } from "../types/transaction";
 import AnnualReportDashboard from "./AnnualReportDashboard";
@@ -50,6 +55,9 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionSubcategories, setTransactionSubcategories] = useState<
+    TransactionSubcategoryOption[]
+  >([]);
   const [budgetPreference, setBudgetPreference] = useState<BudgetPreference>(
     DEFAULT_BUDGET_PREFERENCES
   );
@@ -67,14 +75,20 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
       setDataError("");
 
       try {
-        const [nextTransactions, nextBudgetPreference] = await Promise.all([
+        const [
+          nextTransactions,
+          nextBudgetPreference,
+          nextTransactionSubcategories
+        ] = await Promise.all([
           loadTransactions(userId),
-          loadBudgetPreference(userId)
+          loadBudgetPreference(userId),
+          loadTransactionSubcategories(userId)
         ]);
 
         if (isActive) {
           setTransactions(nextTransactions);
           setBudgetPreference(nextBudgetPreference);
+          setTransactionSubcategories(nextTransactionSubcategories);
         }
       } catch (error) {
         if (isActive) {
@@ -101,6 +115,18 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
     [transactions, selectedMonth, selectedYear]
   );
 
+  const subcategoriesByType = useMemo(
+    () =>
+      transactionSubcategories.reduce<TransactionSubcategoriesByType>(
+        (groups, subcategory) => {
+          groups[subcategory.type] = [...(groups[subcategory.type] ?? []), subcategory];
+          return groups;
+        },
+        {}
+      ),
+    [transactionSubcategories]
+  );
+
   const summary = useMemo(
     () => calculateBudgetSummary(transactions, selectedYear, selectedMonth, budgetPreference),
     [budgetPreference, transactions, selectedMonth, selectedYear]
@@ -119,6 +145,11 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
   async function refreshTransactions() {
     const nextTransactions = await loadTransactions(userId);
     setTransactions(nextTransactions);
+  }
+
+  async function refreshSubcategories() {
+    const nextSubcategories = await loadTransactionSubcategories(userId);
+    setTransactionSubcategories(nextSubcategories);
   }
 
   async function handleSaveTransaction(draft: TransactionDraft) {
@@ -168,6 +199,39 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
       throw new Error(message);
     } finally {
       setIsSavingBudgetPreference(false);
+    }
+  }
+
+  async function handleAddSubcategory(type: TransactionType, name: string) {
+    setDataError("");
+
+    try {
+      await addTransactionSubcategory(userId, type, name);
+      await refreshSubcategories();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to add subcategory.";
+      setDataError(message);
+      throw new Error(message);
+    }
+  }
+
+  async function handleArchiveSubcategory(subcategory: TransactionSubcategoryOption) {
+    const confirmed = window.confirm(`Archive "${subcategory.name}"? Existing entries stay visible.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDataError("");
+
+    try {
+      await archiveTransactionSubcategory(userId, subcategory.id);
+      await refreshSubcategories();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to archive this subcategory.";
+      setDataError(message);
+      throw new Error(message);
     }
   }
 
@@ -279,7 +343,10 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
                     selectedMonth,
                     type
                   )}
+                  subcategoriesByType={subcategoriesByType}
                   onAdd={() => setModalState({ type })}
+                  onAddSubcategory={handleAddSubcategory}
+                  onArchiveSubcategory={handleArchiveSubcategory}
                   onDelete={handleDeleteTransaction}
                   onEdit={(transaction) => setModalState({ transaction })}
                 />
@@ -305,6 +372,7 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
           defaultDate={modalState.date}
           initialType={modalState.type}
           transaction={modalState.transaction}
+          subcategoriesByType={subcategoriesByType}
           onClose={() => setModalState(null)}
           onSubmit={handleSaveTransaction}
         />

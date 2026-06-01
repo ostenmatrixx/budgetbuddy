@@ -9,13 +9,19 @@ import {
   clampTransactionPage,
   filterTransactionsByMonth,
   formatCurrency,
+  UNCATEGORIZED_SUBCATEGORY_LABEL,
   normalizeTransactionSubcategory,
   paginateTransactions,
+  resolveSelectedSubcategoryLabel,
   sortTransactionsForDisplay,
   validateBudgetPreferenceInput,
   validateTransactionInput
 } from "./budget";
-import type { Transaction } from "../types/transaction";
+import type {
+  Transaction,
+  TransactionSubcategoriesByType,
+  TransactionSubcategoryOption
+} from "../types/transaction";
 
 const transactions: Transaction[] = [
   {
@@ -293,12 +299,30 @@ describe("calculateAnnualReport", () => {
 });
 
 describe("subcategory helpers", () => {
-  it("uses legacy fallback subcategories for existing essentials and savings entries", () => {
-    expect(normalizeTransactionSubcategory({ type: "bills" })).toBe("Bills");
-    expect(normalizeTransactionSubcategory({ type: "savings" })).toBe("Cash Savings");
-    expect(normalizeTransactionSubcategory({ type: "income" })).toBe("Income");
-    expect(normalizeTransactionSubcategory({ type: "non_essentials" })).toBe(
-      "Non-Essentials"
+  const subcategoryOptions: TransactionSubcategoryOption[] = [
+    createSubcategory("income-paycheck", "income", "Paycheck"),
+    createSubcategory("income-side-work", "income", "Side work"),
+    createSubcategory("bills-utilities", "bills", "Utilities"),
+    createSubcategory("bills-rent", "bills", "Rent"),
+    createSubcategory("savings-emergency", "savings", "Emergency fund"),
+    createSubcategory("non-essentials-food", "non_essentials", "Food")
+  ];
+  const subcategoriesByType: TransactionSubcategoriesByType = {
+    income: subcategoryOptions.filter((option) => option.type === "income"),
+    bills: subcategoryOptions.filter((option) => option.type === "bills"),
+    savings: subcategoryOptions.filter((option) => option.type === "savings"),
+    non_essentials: subcategoryOptions.filter((option) => option.type === "non_essentials")
+  };
+
+  it("uses an uncategorized fallback for transactions without a subcategory", () => {
+    expect(normalizeTransactionSubcategory({ type: "bills" })).toBe(
+      UNCATEGORIZED_SUBCATEGORY_LABEL
+    );
+    expect(normalizeTransactionSubcategory({ type: "savings", subcategory: "" })).toBe(
+      UNCATEGORIZED_SUBCATEGORY_LABEL
+    );
+    expect(normalizeTransactionSubcategory({ type: "income", subcategory: " Paycheck " })).toBe(
+      "Paycheck"
     );
   });
 
@@ -376,14 +400,14 @@ describe("subcategory helpers", () => {
     ]);
   });
 
-  it("groups essentials transactions into all subcategory cards with totals", () => {
+  it("groups transactions into active, archived, legacy, and uncategorized cards", () => {
     const result = calculateSubcategoryGroups(
       [
         ...transactions,
         {
           id: "6",
           type: "bills",
-          subcategory: "House",
+          subcategory: "Utilities",
           amount: 8000,
           date: "2026-05-12",
           description: "Repairs",
@@ -394,18 +418,19 @@ describe("subcategory helpers", () => {
         {
           id: "7",
           type: "bills",
-          subcategory: "Credit Card",
+          subcategory: "Archived card",
           amount: 5000,
-          date: "2026-04-18",
-          description: "Prior month card",
+          date: "2026-05-18",
+          description: "Prior card",
           notes: "",
-          createdAt: "2026-04-18T00:00:00.000Z",
-          updatedAt: "2026-04-18T00:00:00.000Z"
+          createdAt: "2026-05-18T00:00:00.000Z",
+          updatedAt: "2026-05-18T00:00:00.000Z"
         }
       ],
       2026,
       5,
-      "bills"
+      "bills",
+      subcategoriesByType
     );
 
     expect(result.map((group) => ({
@@ -413,24 +438,24 @@ describe("subcategory helpers", () => {
       total: group.total,
       transactionIds: group.transactions.map((transaction) => transaction.id)
     }))).toEqual([
-      { label: "Bills", total: 12000, transactionIds: ["2"] },
-      { label: "House", total: 8000, transactionIds: ["6"] },
-      { label: "Lot", total: 0, transactionIds: [] },
-      { label: "Credit Card", total: 0, transactionIds: [] }
+      { label: "Uncategorized", total: 12000, transactionIds: ["2"] },
+      { label: "Utilities", total: 8000, transactionIds: ["6"] },
+      { label: "Rent", total: 0, transactionIds: [] },
+      { label: "Archived card", total: 5000, transactionIds: ["7"] }
     ]);
   });
 
-  it("groups savings transactions and applies legacy fallback subcategories", () => {
+  it("groups all main category types, including income and non-essentials", () => {
     const result = calculateSubcategoryGroups(
       [
         ...transactions,
         {
           id: "6",
-          type: "savings",
-          subcategory: "Emergency Funds",
+          type: "income",
+          subcategory: "Side work",
           amount: 5000,
           date: "2026-05-12",
-          description: "Emergency transfer",
+          description: "Client invoice",
           notes: "",
           createdAt: "2026-05-12T00:00:00.000Z",
           updatedAt: "2026-05-12T00:00:00.000Z"
@@ -438,7 +463,8 @@ describe("subcategory helpers", () => {
       ],
       2026,
       5,
-      "savings"
+      "income",
+      subcategoriesByType
     );
 
     expect(result.map((group) => ({
@@ -446,14 +472,44 @@ describe("subcategory helpers", () => {
       total: group.total,
       transactionIds: group.transactions.map((transaction) => transaction.id)
     }))).toEqual([
-      { label: "Cash Savings", total: 15000, transactionIds: ["4"] },
-      { label: "Emergency Funds", total: 5000, transactionIds: ["6"] }
+      { label: "Uncategorized", total: 50000, transactionIds: ["1"] },
+      { label: "Paycheck", total: 0, transactionIds: [] },
+      { label: "Side work", total: 5000, transactionIds: ["6"] }
     ]);
   });
 
-  it("returns no subcategory groups for categories without subcategories", () => {
-    expect(calculateSubcategoryGroups(transactions, 2026, 5, "income")).toEqual([]);
-    expect(calculateSubcategoryGroups(transactions, 2026, 5, "non_essentials")).toEqual([]);
+  it("excludes archived subcategories from empty cards unless transactions use them", () => {
+    const result = calculateSubcategoryGroups(
+      transactions,
+      2026,
+      5,
+      "savings",
+      {
+        savings: [
+          createSubcategory("active", "savings", "Emergency fund"),
+          createSubcategory("archived", "savings", "Old vault", false)
+        ]
+      }
+    );
+
+    expect(result.map((group) => group.label)).toEqual([
+      "Uncategorized",
+      "Emergency fund"
+    ]);
+  });
+
+  it("keeps a valid selected subcategory and falls back when it is unavailable", () => {
+    const groups = calculateSubcategoryGroups(
+      transactions,
+      2026,
+      5,
+      "income",
+      subcategoriesByType
+    );
+
+    expect(resolveSelectedSubcategoryLabel(groups, "Paycheck")).toBe("Paycheck");
+    expect(resolveSelectedSubcategoryLabel(groups, "Missing")).toBe("Uncategorized");
+    expect(resolveSelectedSubcategoryLabel([], "Paycheck")).toBe("");
   });
 });
 
@@ -592,7 +648,7 @@ describe("validateTransactionInput", () => {
       amount: "1250.50",
       date: "2026-05-15",
       description: " Freelance ",
-      subcategory: "Bills",
+      subcategory: "",
       notes: " Optional note "
     });
 
@@ -602,12 +658,13 @@ describe("validateTransactionInput", () => {
       amount: 1250.5,
       date: "2026-05-15",
       description: "Freelance",
+      subcategory: undefined,
       notes: "Optional note"
     });
   });
 
-  it("requires valid subcategories for essentials and savings", () => {
-    const missingSubcategory = validateTransactionInput({
+  it("allows missing subcategories for every transaction type", () => {
+    const result = validateTransactionInput({
       type: "bills",
       amount: "2500",
       date: "2026-05-15",
@@ -615,28 +672,40 @@ describe("validateTransactionInput", () => {
       subcategory: "",
       notes: ""
     });
+
+    expect(result.isValid).toBe(true);
+    expect(result.value?.type).toBe("bills");
+    expect(result.value?.subcategory).toBeUndefined();
+  });
+
+  it("requires a selected subcategory to be active for its type", () => {
+    const options: TransactionSubcategoriesByType = {
+      income: [createSubcategory("income-paycheck", "income", "Paycheck")],
+      bills: [createSubcategory("bills-utilities", "bills", "Utilities")],
+      savings: [createSubcategory("savings-emergency", "savings", "Emergency fund")]
+    };
+
     const invalidSubcategory = validateTransactionInput({
       type: "savings",
       amount: "3000",
       date: "2026-05-16",
       description: "Transfer",
-      subcategory: "House",
+      subcategory: "Utilities",
       notes: ""
-    });
+    }, options);
     const validSubcategory = validateTransactionInput({
-      type: "savings",
+      type: "income",
       amount: "3000",
       date: "2026-05-16",
-      description: "Transfer",
-      subcategory: "Emergency Funds",
+      description: "Salary",
+      subcategory: "Paycheck",
       notes: ""
-    });
+    }, options);
 
-    expect(missingSubcategory.errors.subcategory).toBe("Choose a subcategory.");
     expect(invalidSubcategory.errors.subcategory).toBe("Choose a valid subcategory.");
     expect(validSubcategory.value).toMatchObject({
-      type: "savings",
-      subcategory: "Emergency Funds"
+      type: "income",
+      subcategory: "Paycheck"
     });
   });
 });
@@ -646,3 +715,19 @@ describe("formatCurrency", () => {
     expect(formatCurrency(1234.5)).toBe("₱1,234.50");
   });
 });
+
+function createSubcategory(
+  id: string,
+  type: TransactionSubcategoryOption["type"],
+  name: string,
+  isActive = true
+): TransactionSubcategoryOption {
+  return {
+    id,
+    type,
+    name,
+    isActive,
+    createdAt: "2026-05-01T00:00:00.000Z",
+    updatedAt: "2026-05-01T00:00:00.000Z"
+  };
+}

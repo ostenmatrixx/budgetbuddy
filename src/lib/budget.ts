@@ -1,13 +1,11 @@
 import {
-  defaultSubcategoryByType,
-  transactionSubcategoriesByType,
   transactionTypeShortLabels,
   transactionTypes,
   type Transaction,
+  type TransactionSubcategoriesByType,
   type TransactionDraft,
   type TransactionErrors,
   type TransactionFormValues,
-  type TransactionSubcategory,
   type TransactionType
 } from "../types/transaction";
 
@@ -105,6 +103,7 @@ export const DEFAULT_BUDGET_PREFERENCES: BudgetPreference = {
   nonEssentialsPercent: 20
 };
 
+export const UNCATEGORIZED_SUBCATEGORY_LABEL = "Uncategorized";
 export const TRANSACTION_PAGE_SIZE = 5;
 export const DEFAULT_CURRENCY = import.meta.env.VITE_BUDGET_CURRENCY || "PHP";
 
@@ -332,17 +331,7 @@ export function calculateAnnualReport(transactions: Transaction[], year: number)
 export function normalizeTransactionSubcategory(
   transaction: Pick<Transaction, "type"> & { subcategory?: string | null }
 ): string {
-  const allowedSubcategories = transactionSubcategoriesByType[transaction.type] ?? [];
-
-  if (allowedSubcategories.length === 0) {
-    return transactionTypeShortLabels[transaction.type];
-  }
-
-  if (isValidSubcategoryForType(transaction.type, transaction.subcategory ?? "")) {
-    return transaction.subcategory as TransactionSubcategory;
-  }
-
-  return defaultSubcategoryByType[transaction.type] ?? transactionTypeShortLabels[transaction.type];
+  return normalizeSubcategoryLabel(transaction.subcategory) || UNCATEGORIZED_SUBCATEGORY_LABEL;
 }
 
 export function calculateCategoryPieSegments(
@@ -379,19 +368,29 @@ export function calculateSubcategoryGroups(
   transactions: Transaction[],
   year: number,
   month: number,
-  type: TransactionType
+  type: TransactionType,
+  subcategoriesByType: TransactionSubcategoriesByType = {}
 ): SubcategoryGroup[] {
-  const subcategories = transactionSubcategoriesByType[type] ?? [];
-
-  if (subcategories.length === 0) {
-    return [];
-  }
-
   const categoryTransactions = filterTransactionsByMonth(transactions, year, month).filter(
     (transaction) => transaction.type === type
   );
+  const groupLabels = [
+    UNCATEGORIZED_SUBCATEGORY_LABEL,
+    ...getActiveSubcategoryNames(subcategoriesByType, type)
+  ];
+  const labelKeys = new Set(groupLabels.map(createSubcategoryKey));
 
-  return subcategories.map((label) => {
+  categoryTransactions.forEach((transaction) => {
+    const label = normalizeTransactionSubcategory(transaction);
+    const key = createSubcategoryKey(label);
+
+    if (!labelKeys.has(key)) {
+      labelKeys.add(key);
+      groupLabels.push(label);
+    }
+  });
+
+  return groupLabels.map((label) => {
     const groupTransactions = categoryTransactions.filter(
       (transaction) => normalizeTransactionSubcategory(transaction) === label
     );
@@ -406,11 +405,29 @@ export function calculateSubcategoryGroups(
   });
 }
 
-export function validateTransactionInput(values: TransactionFormValues): ValidationResult {
+export function resolveSelectedSubcategoryLabel(
+  groups: SubcategoryGroup[],
+  selectedLabel?: string
+): string {
+  if (groups.length === 0) {
+    return "";
+  }
+
+  if (selectedLabel && groups.some((group) => group.label === selectedLabel)) {
+    return selectedLabel;
+  }
+
+  return groups[0].label;
+}
+
+export function validateTransactionInput(
+  values: TransactionFormValues,
+  subcategoriesByType?: TransactionSubcategoriesByType
+): ValidationResult {
   const errors: TransactionErrors = {};
   const amount = Number(values.amount);
   const type = values.type.trim();
-  const subcategory = values.subcategory?.trim() ?? "";
+  const subcategory = normalizeSubcategoryLabel(values.subcategory);
   const date = values.date.trim();
   const description = values.description.trim();
   const notes = values.notes.trim();
@@ -432,13 +449,10 @@ export function validateTransactionInput(values: TransactionFormValues): Validat
   }
 
   if (isTransactionType(type)) {
-    const allowedSubcategories = transactionSubcategoriesByType[type] ?? [];
-
-    if (allowedSubcategories.length > 0 && !subcategory) {
-      errors.subcategory = "Choose a subcategory.";
-    } else if (
-      allowedSubcategories.length > 0 &&
-      !isValidSubcategoryForType(type, subcategory)
+    if (
+      subcategory &&
+      subcategoriesByType &&
+      !isActiveSubcategoryForType(subcategoriesByType, type, subcategory)
     ) {
       errors.subcategory = "Choose a valid subcategory.";
     }
@@ -456,8 +470,12 @@ export function validateTransactionInput(values: TransactionFormValues): Validat
     notes
   };
 
-  if (isValidSubcategoryForType(value.type, subcategory)) {
-    value.subcategory = subcategory as TransactionSubcategory;
+  if (subcategory) {
+    value.subcategory = getCanonicalSubcategoryName(
+      subcategoriesByType,
+      value.type,
+      subcategory
+    );
   }
 
   return {
@@ -499,10 +517,63 @@ function sumByType(transactions: Transaction[], type: TransactionType): number {
   );
 }
 
-function isValidSubcategoryForType(type: TransactionType, subcategory: string): boolean {
-  return (transactionSubcategoriesByType[type] ?? []).includes(
-    subcategory as TransactionSubcategory
+export function getActiveSubcategoryNames(
+  subcategoriesByType: TransactionSubcategoriesByType,
+  type: TransactionType
+): string[] {
+  const names: string[] = [];
+  const keys = new Set<string>();
+
+  (subcategoriesByType[type] ?? [])
+    .filter((subcategory) => subcategory.isActive)
+    .forEach((subcategory) => {
+      const name = normalizeSubcategoryLabel(subcategory.name);
+      const key = createSubcategoryKey(name);
+
+      if (name && !keys.has(key)) {
+        keys.add(key);
+        names.push(name);
+      }
+    });
+
+  return names;
+}
+
+export function normalizeSubcategoryLabel(value?: string | null): string {
+  return (value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function isActiveSubcategoryForType(
+  subcategoriesByType: TransactionSubcategoriesByType,
+  type: TransactionType,
+  subcategory: string
+): boolean {
+  const subcategoryKey = createSubcategoryKey(subcategory);
+
+  return (subcategoriesByType[type] ?? []).some(
+    (option) =>
+      option.isActive &&
+      createSubcategoryKey(option.name) === subcategoryKey
   );
+}
+
+function getCanonicalSubcategoryName(
+  subcategoriesByType: TransactionSubcategoriesByType | undefined,
+  type: TransactionType,
+  subcategory: string
+): string {
+  const subcategoryKey = createSubcategoryKey(subcategory);
+  const matchedOption = (subcategoriesByType?.[type] ?? []).find(
+    (option) =>
+      option.isActive &&
+      createSubcategoryKey(option.name) === subcategoryKey
+  );
+
+  return matchedOption ? normalizeSubcategoryLabel(matchedOption.name) : subcategory;
+}
+
+function createSubcategoryKey(value: string): string {
+  return normalizeSubcategoryLabel(value).toLocaleLowerCase();
 }
 
 function clampPercent(value: number): number {

@@ -5,8 +5,13 @@ import {
   budgetPreferenceToPayload,
   draftToInsertPayload,
   draftToUpdatePayload,
+  normalizeSubcategoryName,
   rowToTransaction,
+  subcategoryArchivePayload,
+  subcategoryRowToOption,
+  subcategoryToInsertPayload,
   type BudgetPreferenceRow,
+  type TransactionSubcategoryRow,
   type TransactionRow
 } from "./storage";
 import type { TransactionDraft } from "../types/transaction";
@@ -38,6 +43,16 @@ const preferenceRow: BudgetPreferenceRow = {
   essentials_percent: 60,
   savings_percent: 20,
   non_essentials_percent: 20,
+  created_at: "2026-05-18T00:00:00.000Z",
+  updated_at: "2026-05-19T00:00:00.000Z"
+};
+
+const subcategoryRow: TransactionSubcategoryRow = {
+  id: "2f2ed316-603d-4477-a5cb-d6e2b402a61c",
+  user_id: "f6eb4d75-cf59-4e31-8939-d086d9d8ef9d",
+  type: "non_essentials",
+  name: "  Weekend Food  ",
+  is_active: true,
   created_at: "2026-05-18T00:00:00.000Z",
   updated_at: "2026-05-19T00:00:00.000Z"
 };
@@ -114,5 +129,43 @@ describe("Supabase budget preference mapping", () => {
       savings_percent: 20,
       non_essentials_percent: 20
     });
+  });
+});
+
+describe("Supabase subcategory mapping", () => {
+  it("maps subcategory rows to app options with trimmed names", () => {
+    expect(subcategoryRowToOption(subcategoryRow)).toEqual({
+      id: subcategoryRow.id,
+      type: "non_essentials",
+      name: "Weekend Food",
+      isActive: true,
+      createdAt: subcategoryRow.created_at,
+      updatedAt: subcategoryRow.updated_at
+    });
+  });
+
+  it("normalizes duplicate-prone names by trimming and collapsing spaces", () => {
+    expect(normalizeSubcategoryName("  Credit   Card  ")).toBe("Credit Card");
+  });
+
+  it("maps new subcategories to insert payloads", () => {
+    expect(
+      subcategoryToInsertPayload(
+        "f6eb4d75-cf59-4e31-8939-d086d9d8ef9d",
+        "bills",
+        "  Credit   Card  "
+      )
+    ).toEqual({
+      user_id: "f6eb4d75-cf59-4e31-8939-d086d9d8ef9d",
+      type: "bills",
+      name: "Credit Card"
+    });
+  });
+
+  it("archives subcategories instead of deleting them", () => {
+    expect(subcategoryArchivePayload()).toMatchObject({
+      is_active: false
+    });
+    expect(subcategoryArchivePayload().updated_at).toEqual(expect.any(String));
   });
 });

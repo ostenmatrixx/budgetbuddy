@@ -2,12 +2,20 @@ export const transactionTypes = ["income", "bills", "non_essentials", "savings"]
 
 export type TransactionType = (typeof transactionTypes)[number];
 
-export const essentialsSubcategories = ["Bills", "House", "Lot", "Credit Card"] as const;
-export const savingsSubcategories = ["Cash Savings", "Emergency Funds"] as const;
+export type TransactionSubcategory = string;
 
-export type EssentialsSubcategory = (typeof essentialsSubcategories)[number];
-export type SavingsSubcategory = (typeof savingsSubcategories)[number];
-export type TransactionSubcategory = EssentialsSubcategory | SavingsSubcategory;
+export interface TransactionSubcategoryOption {
+  id: string;
+  type: TransactionType;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TransactionSubcategoriesByType = Partial<
+  Record<TransactionType, TransactionSubcategoryOption[]>
+>;
 
 export interface Transaction {
   id: string;
@@ -53,16 +61,4 @@ export const transactionTypeShortLabels: Record<TransactionType, string> = {
   bills: "Essentials",
   non_essentials: "Non-Essentials",
   savings: "Savings"
-};
-
-export const transactionSubcategoriesByType: Partial<
-  Record<TransactionType, readonly TransactionSubcategory[]>
-> = {
-  bills: essentialsSubcategories,
-  savings: savingsSubcategories
-};
-
-export const defaultSubcategoryByType: Partial<Record<TransactionType, TransactionSubcategory>> = {
-  bills: "Bills",
-  savings: "Cash Savings"
 };
