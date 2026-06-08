@@ -326,7 +326,7 @@ describe("subcategory helpers", () => {
     );
   });
 
-  it("aggregates monthly pie segments by transaction description for essentials", () => {
+  it("aggregates monthly pie segments by subcategory for essentials", () => {
     const result = calculateCategoryPieSegments(
       [
         ...transactions,
@@ -359,12 +359,13 @@ describe("subcategory helpers", () => {
     );
 
     expect(result).toEqual([
-      { label: "Rent", value: 17000, percentage: 68 },
-      { label: "Repairs", value: 8000, percentage: 32 }
+      { label: "Uncategorized", value: 12000, percentage: 48 },
+      { label: "House", value: 8000, percentage: 32 },
+      { label: "Credit Card", value: 5000, percentage: 20 }
     ]);
   });
 
-  it("aggregates monthly pie segments by transaction description for savings", () => {
+  it("aggregates monthly pie segments by subcategory for savings", () => {
     const result = calculateCategoryPieSegments(
       [
         ...transactions,
@@ -386,17 +387,17 @@ describe("subcategory helpers", () => {
     );
 
     expect(result).toEqual([
-      { label: "Emergency fund", value: 15000, percentage: 75 },
-      { label: "Emergency transfer", value: 5000, percentage: 25 }
+      { label: "Uncategorized", value: 15000, percentage: 75 },
+      { label: "Emergency Funds", value: 5000, percentage: 25 }
     ]);
   });
 
-  it("uses transaction descriptions for income and non-essentials pie labels", () => {
+  it("uses uncategorized category labels for entries without subcategories", () => {
     expect(calculateCategoryPieSegments(transactions, 2026, 5, "income")).toEqual([
-      { label: "Salary", value: 50000, percentage: 100 }
+      { label: "Uncategorized", value: 50000, percentage: 100 }
     ]);
     expect(calculateCategoryPieSegments(transactions, 2026, 5, "non_essentials")).toEqual([
-      { label: "Dinner", value: 4000, percentage: 100 }
+      { label: "Uncategorized", value: 4000, percentage: 100 }
     ]);
   });
 

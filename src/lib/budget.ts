@@ -1,5 +1,4 @@
 import {
-  transactionTypeShortLabels,
   transactionTypes,
   type Transaction,
   type TransactionSubcategoriesByType,
@@ -346,9 +345,9 @@ export function calculateCategoryPieSegments(
   const total = toMoney(
     categoryTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
   );
-  const totalsByDescription = categoryTransactions.reduce<Map<string, number>>(
+  const totalsByCategory = categoryTransactions.reduce<Map<string, number>>(
     (segments, transaction) => {
-      const label = transaction.description.trim() || transactionTypeShortLabels[type];
+      const label = normalizeTransactionSubcategory(transaction);
       const current = segments.get(label) ?? 0;
       segments.set(label, toMoney(current + transaction.amount));
 
@@ -357,7 +356,7 @@ export function calculateCategoryPieSegments(
     new Map()
   );
 
-  return Array.from(totalsByDescription.entries()).map(([label, value]) => ({
+  return Array.from(totalsByCategory.entries()).map(([label, value]) => ({
       label,
       value,
       percentage: total > 0 ? Math.round((value / total) * 100) : 0
