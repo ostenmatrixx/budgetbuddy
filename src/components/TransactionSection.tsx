@@ -30,6 +30,7 @@ interface TransactionSectionProps {
   subcategoriesByType: TransactionSubcategoriesByType;
   year: number;
   month: number;
+  motionIndex?: number;
   onAdd: () => void;
   onAddSubcategory: (type: TransactionType, name: string) => Promise<void>;
   onArchiveSubcategory: (subcategory: TransactionSubcategoryOption) => Promise<void>;
@@ -44,6 +45,7 @@ export default function TransactionSection({
   subcategoriesByType,
   year,
   month,
+  motionIndex = 0,
   onAdd,
   onAddSubcategory,
   onArchiveSubcategory,
@@ -77,11 +79,26 @@ export default function TransactionSection({
 
   return (
     <>
-      <section className="rounded-lg border border-ecru bg-white p-4 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold">{transactionTypeLabels[type]}</h2>
-            <p className="mt-1 text-sm text-black-bean/70">{formatCurrency(total)}</p>
+      <section className={`app-surface animate-card-in stagger-${(motionIndex % 6) + 1} motion-card overflow-hidden`}>
+        <div className="flex items-start justify-between gap-3 border-b border-surface-variant p-5">
+          <div className="flex min-w-0 items-center gap-4">
+            <span
+              className="material-symbols-outlined animate-pop grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary-fixed text-primary"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              {getCategoryIcon(type)}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
+                Category
+              </p>
+              <h2 className="mt-1 truncate text-2xl font-bold text-on-surface">
+                {transactionTypeLabels[type]}
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-on-surface-variant">
+                {formatCurrency(total)} recorded this month
+              </p>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <CategoryActionButton
@@ -90,37 +107,39 @@ export default function TransactionSection({
               variant="primary"
               onClick={onAdd}
             >
-              <PlusIcon />
+              <MaterialIcon name="add" />
             </CategoryActionButton>
             <CategoryActionButton
               label="Manage subcategories"
               title="Manage subcategories"
               onClick={() => setIsManagingSubcategories(true)}
             >
-              <GearIcon />
+              <MaterialIcon name="settings" />
             </CategoryActionButton>
           </div>
         </div>
 
-        <CategoryPieChart segments={pieSegments} />
+        <div className="p-5 pt-0">
+          <CategoryPieChart segments={pieSegments} />
 
-        {subcategoryGroups.length > 1 ? (
-          <SubcategoryNav
-            groups={subcategoryGroups}
-            selectedLabel={resolvedSubcategoryLabel}
-            onSelect={setSelectedSubcategoryLabel}
-          />
-        ) : null}
-
-        <div className="mt-4 grid gap-3">
-          {selectedSubcategoryGroup ? (
-            <SubcategoryCard
-              group={selectedSubcategoryGroup}
-              key={selectedSubcategoryGroup.label}
-              onDelete={onDelete}
-              onEdit={onEdit}
+          {subcategoryGroups.length > 1 ? (
+            <SubcategoryNav
+              groups={subcategoryGroups}
+              selectedLabel={resolvedSubcategoryLabel}
+              onSelect={setSelectedSubcategoryLabel}
             />
           ) : null}
+
+          <div className="mt-5 grid gap-3">
+            {selectedSubcategoryGroup ? (
+              <SubcategoryCard
+                group={selectedSubcategoryGroup}
+                key={selectedSubcategoryGroup.label}
+                onDelete={onDelete}
+                onEdit={onEdit}
+              />
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -154,8 +173,8 @@ function CategoryActionButton({
 }: CategoryActionButtonProps) {
   const className =
     variant === "primary"
-      ? "grid h-10 w-10 place-items-center rounded-lg bg-maroon text-white transition hover:bg-black-bean focus:outline-none focus:ring-2 focus:ring-maroon/30"
-      : "grid h-10 w-10 place-items-center rounded-lg border border-ecru bg-white text-maroon transition hover:border-maroon hover:bg-light-red/10 focus:outline-none focus:ring-2 focus:ring-maroon/30";
+      ? "motion-icon-button motion-button grid h-11 w-11 place-items-center rounded-lg bg-primary text-on-primary shadow-sm transition hover:bg-black-bean focus:outline-none focus:ring-2 focus:ring-primary/20"
+      : "motion-icon-button motion-button grid h-11 w-11 place-items-center rounded-lg border border-surface-variant bg-surface-container-low text-primary transition hover:border-outline hover:bg-surface-container-high focus:outline-none focus:ring-2 focus:ring-primary/10";
 
   return (
     <button
@@ -170,60 +189,6 @@ function CategoryActionButton({
   );
 }
 
-function PlusIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
-    </svg>
-  );
-}
-
-function GearIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
-      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.38 1.08V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.08-.38H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .38-1.08V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.2.37.56.6 1 .6h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1 .6Z" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
-    </svg>
-  );
-}
-
 interface SubcategoryNavProps {
   groups: SubcategoryGroup[];
   selectedLabel: string;
@@ -234,7 +199,7 @@ function SubcategoryNav({ groups, selectedLabel, onSelect }: SubcategoryNavProps
   return (
     <nav
       aria-label="Subcategories"
-      className="mt-3 overflow-x-auto border-b border-ecru/70 pb-2"
+      className="mt-5 overflow-x-auto rounded-xl border border-surface-variant bg-surface-container-low p-1"
     >
       <div className="flex min-w-max items-center gap-2" role="tablist">
         {groups.map((group) => {
@@ -244,10 +209,10 @@ function SubcategoryNav({ groups, selectedLabel, onSelect }: SubcategoryNavProps
           return (
             <button
               aria-selected={isSelected}
-              className={`rounded-lg px-3 py-2 text-left text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-maroon/25 ${
+              className={`motion-button rounded-lg px-4 py-2.5 text-left text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                 isSelected
-                  ? "bg-maroon text-white shadow-sm"
-                  : "bg-light-red/10 text-black-bean/70 hover:bg-light-red/20 hover:text-maroon"
+                  ? "animate-pop bg-white text-primary shadow-sm"
+                  : "text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
               }`}
               key={group.label}
               role="tab"
@@ -257,7 +222,7 @@ function SubcategoryNav({ groups, selectedLabel, onSelect }: SubcategoryNavProps
               <span className="block max-w-[9rem] truncate">{group.label}</span>
               <span
                 className={`mt-0.5 block font-semibold ${
-                  isSelected ? "text-white/75" : "text-black-bean/45"
+                  isSelected ? "text-outline" : "text-outline"
                 }`}
               >
                 {group.transactions.length} {entryLabel}
@@ -356,7 +321,7 @@ function SubcategoryManagerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end bg-black-bean/45 px-3 py-4 sm:items-center sm:justify-center"
+      className="motion-backdrop fixed inset-0 z-50 flex items-end bg-black-bean/45 px-3 py-4 backdrop-blur-[2px] sm:items-center sm:justify-center"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -366,87 +331,104 @@ function SubcategoryManagerModal({
       <section
         aria-labelledby={headingId}
         aria-modal="true"
-        className="animate-modal-in max-h-[calc(100svh-2rem)] w-full overflow-y-auto rounded-lg border border-ecru bg-white p-5 shadow-[0_20px_80px_rgba(50,24,24,0.22)] sm:max-w-lg"
+        className="animate-modal-in max-h-[calc(100svh-2rem)] w-full overflow-y-auto rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_24px_90px_rgba(50,24,24,0.24)] sm:max-w-lg"
         role="dialog"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-maroon">
-              {transactionTypeLabels[type]}
-            </p>
-            <h3 className="mt-1 text-xl font-bold" id={headingId}>
-              Subcategories
-            </h3>
-            <p className="mt-1 text-sm text-black-bean/60">
-              Add options for {transactionTypeLabels[type].toLowerCase()} entries.
-            </p>
+        <div className="flex items-start justify-between gap-3 border-b border-surface-variant p-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="material-symbols-outlined animate-pop grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-fixed text-primary">
+              tune
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
+                {transactionTypeLabels[type]}
+              </p>
+              <h3 className="mt-1 text-xl font-bold text-on-surface" id={headingId}>
+                Subcategories
+              </h3>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                Add options for {transactionTypeLabels[type].toLowerCase()} entries.
+              </p>
+            </div>
           </div>
           <button
             aria-label="Close subcategory manager"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-ecru text-black-bean transition hover:border-maroon hover:text-maroon focus:outline-none focus:ring-2 focus:ring-maroon/20"
+            className="icon-control shrink-0"
             title="Close"
             type="button"
             onClick={onClose}
           >
-            <XIcon />
+            <MaterialIcon name="close" />
           </button>
         </div>
 
-        <div className="mt-4 flex justify-start">
-          <span className="rounded-full bg-light-red/15 px-3 py-1.5 text-xs font-bold text-maroon">
-            {activeNames.length} active
-          </span>
-        </div>
+        <div className="p-5">
+          <div className="flex justify-start">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-fixed px-3 py-1.5 text-xs font-bold text-primary">
+              <MaterialIcon className="text-[16px]" name="settings" />
+              {activeNames.length} active
+            </span>
+          </div>
 
-        <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={handleSubmit}>
-          <label className="min-w-0 flex-1 text-xs font-bold text-black-bean/65">
-            New subcategory
-            <input
-              className="mt-1 w-full rounded-lg border border-ecru bg-white px-3 py-2 text-sm text-black-bean outline-none transition focus:border-maroon focus:ring-2 focus:ring-maroon/20"
-              maxLength={60}
-              value={name}
-              onChange={(event) => {
-                setName(event.target.value);
-                setError("");
-              }}
-            />
-          </label>
-          <button
-            className="rounded-lg bg-maroon px-4 py-2 text-sm font-bold text-white transition hover:bg-black-bean focus:outline-none focus:ring-2 focus:ring-maroon/30 disabled:cursor-not-allowed disabled:opacity-50 sm:self-end"
-            disabled={isSaving}
-            type="submit"
-          >
-            Add
-          </button>
-        </form>
+          <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={handleSubmit}>
+            <label className="min-w-0 flex-1 text-xs font-bold uppercase tracking-[0.05em] text-outline">
+              New subcategory
+              <span className="input-well mt-1 flex items-center gap-2 rounded-xl px-3 py-2">
+                <MaterialIcon className="text-[20px] text-outline" name="add_circle" />
+                <input
+                  className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold text-on-surface outline-none focus:ring-0"
+                  maxLength={60}
+                  value={name}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    setError("");
+                  }}
+                />
+              </span>
+            </label>
+            <button
+              className="motion-button motion-icon-button inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-black-bean focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:self-end"
+              disabled={isSaving}
+              type="submit"
+            >
+              <MaterialIcon className="text-[20px]" name="add" />
+              Add
+            </button>
+          </form>
 
-        {error ? <p className="mt-2 text-xs font-semibold text-maroon">{error}</p> : null}
+          {error ? <p className="mt-2 text-xs font-semibold text-maroon">{error}</p> : null}
 
-        <div className="mt-4 grid gap-2">
-          {activeSubcategories.length === 0 ? (
-            <p className="rounded-lg bg-light-red/5 px-3 py-3 text-sm text-black-bean/60">
-              No active subcategories yet.
-            </p>
-          ) : (
-            activeSubcategories.map((subcategory) => (
-              <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-ecru/70 bg-white px-3 py-2"
-                key={subcategory.id}
-              >
-                <span className="min-w-0 truncate text-sm font-semibold">
-                  {subcategory.name}
-                </span>
-                <button
-                  className="rounded-lg border border-light-red px-3 py-1.5 text-xs font-bold text-maroon transition hover:bg-light-red/25 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={isSaving}
-                  type="button"
-                  onClick={() => void handleArchive(subcategory)}
+          <div className="mt-4 grid gap-2">
+            {activeSubcategories.length === 0 ? (
+              <p className="rounded-lg bg-surface-container-low px-3 py-3 text-sm text-on-surface-variant">
+                No active subcategories yet.
+              </p>
+            ) : (
+              activeSubcategories.map((subcategory) => (
+                <div
+                  className="animate-slide-up flex items-center justify-between gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2.5 transition hover:bg-surface-container-low"
+                  key={subcategory.id}
                 >
-                  Archive
-                </button>
-              </div>
-            ))
-          )}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <MaterialIcon className="text-[20px] text-primary" name="sell" />
+                    <span className="min-w-0 truncate text-sm font-semibold">
+                      {subcategory.name}
+                    </span>
+                  </span>
+                  <button
+                    aria-label={`Archive ${subcategory.name}`}
+                    className="motion-icon-button grid h-9 w-9 place-items-center rounded-lg border border-outline-variant text-primary transition hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isSaving}
+                    title="Archive"
+                    type="button"
+                    onClick={() => void handleArchive(subcategory)}
+                  >
+                    <MaterialIcon className="text-[20px]" name="archive" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </section>
     </div>
@@ -464,19 +446,21 @@ function SubcategoryCard({ group, onDelete, onEdit }: SubcategoryCardProps) {
   const listState = usePaginatedTransactionList(group.transactions);
 
   return (
-    <div className="rounded-lg border border-light-red/30 bg-light-red/5 p-3">
-      <div className="flex items-start justify-between gap-3">
+    <div className="animate-card-in overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest">
+      <div className="flex items-start justify-between gap-3 border-b border-surface-variant p-4">
         <div>
-          <h3 className="text-sm font-bold">{group.label}</h3>
-          <p className="mt-1 text-xs text-black-bean/60">
+          <h3 className="text-lg font-bold text-on-surface">{group.label}</h3>
+          <p className="mt-1 text-xs font-semibold text-outline">
             {group.transactions.length} {entryLabel}
           </p>
         </div>
-        <strong className="text-sm">{formatCurrency(group.total)}</strong>
+        <strong className="rounded-full bg-surface-container px-3 py-1 text-sm text-on-surface">
+          {formatCurrency(group.total)}
+        </strong>
       </div>
 
       {group.transactions.length === 0 ? (
-        <p className="mt-3 rounded-lg bg-white/70 px-3 py-3 text-sm text-black-bean/60">
+        <p className="m-4 rounded-lg bg-surface-container-low px-3 py-3 text-sm text-on-surface-variant">
           No entries yet.
         </p>
       ) : (
@@ -514,8 +498,8 @@ function PaginatedTransactionList({
   const { page, setPage, setSortOrder, sortOrder } = listState;
   const listClassName =
     surface === "subtle"
-      ? "mt-3 divide-y divide-ecru/70 rounded-lg bg-white/75 px-3"
-      : "divide-y divide-ecru/60 rounded-lg bg-white";
+      ? "divide-y divide-surface-variant bg-surface-container-lowest"
+      : "divide-y divide-surface-variant rounded-xl border border-surface-variant bg-surface-container-lowest";
 
   return (
     <div>
@@ -555,15 +539,15 @@ function TransactionListToolbar({
   onChangeSortOrder
 }: TransactionListToolbarProps) {
   return (
-    <div className="mb-2 flex items-center justify-between gap-3 text-xs">
-      <span className="font-semibold text-black-bean/55">Sort</span>
-      <div className="grid grid-cols-2 rounded-lg border border-ecru bg-white p-0.5">
+    <div className="flex items-center justify-between gap-3 border-b border-surface-variant bg-surface-container-low/50 px-4 py-3 text-xs">
+      <span className="font-bold uppercase tracking-[0.05em] text-outline">Sort</span>
+      <div className="grid grid-cols-2 rounded-lg bg-surface-container p-0.5">
         {(["newest", "oldest"] as const).map((nextSortOrder) => (
           <button
-            className={`rounded-md px-2 py-1 font-bold transition ${
+            className={`motion-button rounded-md px-2 py-1 font-bold transition ${
               sortOrder === nextSortOrder
-                ? "bg-light-red/25 text-maroon"
-                : "text-black-bean/60 hover:text-maroon"
+                ? "animate-pop bg-white text-primary shadow-sm"
+                : "text-outline hover:text-primary"
             }`}
             key={nextSortOrder}
             type="button"
@@ -593,25 +577,27 @@ function PaginationFooter({
   onPageChange
 }: PaginationFooterProps) {
   return (
-    <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+    <div className="flex items-center justify-between gap-3 border-t border-surface-variant bg-surface-container-low/50 px-4 py-3 text-xs">
       <button
-        className="rounded-lg border border-ecru px-3 py-2 font-bold text-black-bean/70 transition hover:border-maroon hover:text-maroon disabled:cursor-not-allowed disabled:opacity-45"
+        className="motion-button motion-icon-button inline-flex items-center gap-1 rounded-lg border border-surface-variant bg-white px-3 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
         type="button"
         disabled={!hasPreviousPage}
         onClick={() => onPageChange(currentPage - 1)}
       >
+        <MaterialIcon className="text-[18px]" name="chevron_left" />
         Previous
       </button>
-      <span className="font-semibold text-black-bean/60">
+      <span className="font-semibold text-outline">
         Page {currentPage} of {totalPages}
       </span>
       <button
-        className="rounded-lg border border-ecru px-3 py-2 font-bold text-black-bean/70 transition hover:border-maroon hover:text-maroon disabled:cursor-not-allowed disabled:opacity-45"
+        className="motion-button motion-icon-button inline-flex items-center gap-1 rounded-lg border border-surface-variant bg-white px-3 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
         type="button"
         disabled={!hasNextPage}
         onClick={() => onPageChange(currentPage + 1)}
       >
         Next
+        <MaterialIcon className="text-[18px]" name="chevron_right" />
       </button>
     </div>
   );
@@ -624,20 +610,28 @@ interface TransactionRowProps {
 }
 
 function TransactionRow({ transaction, onDelete, onEdit }: TransactionRowProps) {
+  const subcategory = normalizeTransactionSubcategory(transaction);
+
   return (
-    <article className="flex min-h-[4.5rem] flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <p className="truncate font-semibold">{transaction.description}</p>
-        <p className="mt-1 truncate text-sm text-black-bean/70">
-          {transaction.date}
-          {` - ${normalizeTransactionSubcategory(transaction)}`}
-          {transaction.notes ? ` - ${transaction.notes}` : ""}
-        </p>
+    <article className="group animate-fade-in grid min-h-[5rem] gap-3 px-4 py-3 transition hover:bg-surface-container-low sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="material-symbols-outlined grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-container text-primary transition group-hover:bg-primary group-hover:text-on-primary">
+          {getCategoryIcon(transaction.type)}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-on-surface">
+            {transaction.description}
+          </p>
+          <p className="mt-1 truncate text-xs font-semibold text-outline">
+            {subcategory} · {transaction.date}
+            {transaction.notes ? ` · ${transaction.notes}` : ""}
+          </p>
+        </div>
       </div>
       <div className="flex items-center gap-2 sm:justify-end">
-        <strong className="mr-auto sm:mr-3">{formatCurrency(transaction.amount)}</strong>
+        <strong className="mr-auto text-sm sm:mr-3">{formatCurrency(transaction.amount)}</strong>
         <IconButton label="Edit transaction" title="Edit transaction" onClick={() => onEdit(transaction)}>
-          <PencilIcon />
+          <MaterialIcon className="text-[20px]" name="edit" />
         </IconButton>
         <IconButton
           label="Delete transaction"
@@ -645,7 +639,7 @@ function TransactionRow({ transaction, onDelete, onEdit }: TransactionRowProps) 
           variant="danger"
           onClick={() => onDelete(transaction)}
         >
-          <TrashIcon />
+          <MaterialIcon className="text-[20px]" name="delete" />
         </IconButton>
       </div>
     </article>
@@ -698,8 +692,8 @@ function IconButton({
 }: IconButtonProps) {
   const className =
     variant === "danger"
-      ? "rounded-lg border border-light-red p-2 text-maroon transition hover:bg-light-red/25 focus:outline-none focus:ring-2 focus:ring-maroon/20"
-      : "rounded-lg border border-ecru p-2 text-black-bean transition hover:border-maroon hover:text-maroon focus:outline-none focus:ring-2 focus:ring-maroon/20";
+      ? "motion-icon-button grid h-9 w-9 place-items-center rounded-lg border border-outline-variant bg-white text-primary transition hover:bg-primary-fixed focus:outline-none focus:ring-2 focus:ring-primary/20"
+      : "motion-icon-button grid h-9 w-9 place-items-center rounded-lg border border-surface-variant bg-white text-on-surface-variant transition hover:border-outline hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
   return (
     <button
@@ -714,41 +708,35 @@ function IconButton({
   );
 }
 
-function PencilIcon() {
+interface MaterialIconProps {
+  className?: string;
+  filled?: boolean;
+  name: string;
+}
+
+function MaterialIcon({ className = "text-[22px]", filled = false, name }: MaterialIconProps) {
   return (
-    <svg
+    <span
       aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
+      className={`material-symbols-outlined ${className}`}
+      style={{ fontVariationSettings: filled ? "'FILL' 1" : undefined }}
     >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
+      {name}
+    </span>
   );
 }
 
-function TrashIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v5" />
-      <path d="M14 11v5" />
-    </svg>
-  );
+function getCategoryIcon(type: TransactionType) {
+  switch (type) {
+    case "bills":
+      return "receipt_long";
+    case "non_essentials":
+      return "shopping_bag";
+    case "savings":
+      return "savings";
+    case "income":
+      return "payments";
+    default:
+      return "receipt_long";
+  }
 }

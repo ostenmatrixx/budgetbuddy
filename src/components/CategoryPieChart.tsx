@@ -4,43 +4,74 @@ interface CategoryPieChartProps {
   segments: CategoryPieSegment[];
 }
 
-const segmentColors = ["#A64242", "#F3A6A6", "#321818", "#F6D5D5"];
+const segmentColors = ["#af101a", "#9e4039", "#fb877d", "#455b65", "#ffb3ac"];
 
 export default function CategoryPieChart({ segments }: CategoryPieChartProps) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
-  const gradient = buildGradient(segments);
+  const topSegment = segments.find((segment) => segment.value > 0);
+  const ringSegments = buildRingSegments(segments);
 
   return (
-    <div className="mt-4 grid gap-4 rounded-lg bg-light-red/5 p-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
+    <div className="animate-card-in mt-5 grid gap-5 rounded-xl border border-surface-variant bg-surface-container-lowest p-4 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center">
       <div className="flex justify-center">
         <div
-          aria-label={total > 0 ? "Category pie chart" : "No category entries yet"}
-          className="grid h-24 w-24 place-items-center rounded-full border border-ecru"
+          aria-label={total > 0 ? "Category donut chart" : "No category entries yet"}
+          className="chart-container relative grid h-40 w-40 place-items-center rounded-full"
           role="img"
-          style={{
-            background: total > 0 ? gradient : "#fff7f7"
-          }}
         >
-          <div className="h-14 w-14 rounded-full bg-white shadow-inner" />
+          <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+            <circle cx="18" cy="18" fill="transparent" r="15.5" stroke="#eeeef0" strokeWidth="3" />
+            {ringSegments.map((segment) => (
+              <circle
+                cx="18"
+                cy="18"
+                fill="transparent"
+                key={segment.label}
+                r="15.5"
+                stroke={segment.color}
+                strokeDasharray={`${segment.percentage} 100`}
+                strokeDashoffset={segment.offset}
+                strokeLinecap="round"
+                className="animate-fade-in"
+                strokeWidth="3"
+              />
+            ))}
+          </svg>
+          <div className="absolute inset-6 flex flex-col items-center justify-center rounded-full bg-white text-center shadow-[inset_0_0_0_1px_rgba(226,226,228,0.7)]">
+            <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-outline">
+              {total > 0 ? "Top" : "Empty"}
+            </span>
+            <span className="mt-1 max-w-[5.5rem] truncate text-base font-bold text-on-surface">
+              {topSegment?.label ?? "No entries"}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid gap-3">
+        {segments.length === 0 ? (
+          <p className="rounded-lg bg-surface-container-low px-3 py-3 text-sm font-medium text-on-surface-variant">
+            No category entries yet.
+          </p>
+        ) : null}
         {segments.map((segment, index) => (
           <div
-            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs"
+            className={`animate-slide-up stagger-${(index % 6) + 1} grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-sm`}
             key={segment.label}
           >
-            <span className="flex min-w-0 items-center gap-2 text-black-bean/70">
+            <span className="flex min-w-0 items-center gap-2 text-on-surface-variant">
               <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                className="h-3 w-3 shrink-0 rounded-full"
                 style={{ backgroundColor: segmentColors[index % segmentColors.length] }}
               />
-              <span className="truncate">{segment.label}</span>
+              <span className="truncate font-semibold">{segment.label}</span>
             </span>
-            <strong className="text-right text-black-bean">
-              {segment.percentage}% - {formatCurrency(segment.value)}
-            </strong>
+            <span className="text-right">
+              <strong className="block text-sm text-on-surface">{segment.percentage}%</strong>
+              <span className="block text-xs font-semibold text-outline">
+                {formatCurrency(segment.value)}
+              </span>
+            </span>
           </div>
         ))}
       </div>
@@ -48,25 +79,28 @@ export default function CategoryPieChart({ segments }: CategoryPieChartProps) {
   );
 }
 
-function buildGradient(segments: CategoryPieSegment[]): string {
+function buildRingSegments(segments: CategoryPieSegment[]) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
 
   if (total <= 0) {
-    return "#fff7f7";
+    return [];
   }
 
   let cursor = 0;
-  const stops = segments
+  return segments
     .map((segment, index) => ({ segment, index }))
     .filter(({ segment }) => segment.value > 0)
     .map(({ segment, index }) => {
-      const start = cursor;
-      const size = (segment.value / total) * 100;
-      cursor += size;
+      const percentage = (segment.value / total) * 100;
+      const offset = -cursor;
+      cursor += percentage;
       const color = segmentColors[index % segmentColors.length];
 
-      return `${color} ${start}% ${cursor}%`;
+      return {
+        color,
+        label: segment.label,
+        offset,
+        percentage
+      };
     });
-
-  return `conic-gradient(${stops.join(", ")})`;
 }

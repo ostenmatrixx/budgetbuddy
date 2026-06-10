@@ -8,9 +8,11 @@ import {
 interface BudgetAllocationCardsProps {
   preference: BudgetPreference;
   summary: BudgetSummary;
+  onEditTargets: () => void;
 }
 
 export default function BudgetAllocationCards({
+  onEditTargets,
   preference,
   summary
 }: BudgetAllocationCardsProps) {
@@ -26,8 +28,12 @@ export default function BudgetAllocationCards({
       label: `${preference.savingsPercent}% Savings`,
       target: summary.savingsTarget,
       actual: summary.savingsSaved,
-      remainingLabel: "Savings to target",
-      remaining: summary.savingsTarget - summary.savingsSaved
+      remainingLabel:
+        summary.savingsSaved > summary.savingsTarget
+          ? "Saved beyond target"
+          : "Savings to target",
+      remaining: Math.abs(summary.savingsTarget - summary.savingsSaved),
+      positiveOverTarget: true
     },
     {
       label: `${preference.nonEssentialsPercent}% Non-Essentials`,
@@ -39,56 +45,79 @@ export default function BudgetAllocationCards({
   ];
 
   return (
-    <section className="grid gap-3 xl:grid-cols-3" aria-label="Budget targets">
-      {cards.map((card) => {
-        const isOver = card.remaining < 0;
-        const percent = progressPercent(card.actual, card.target);
+    <section className="app-surface animate-card-in stagger-2 p-5" aria-label="Budget targets">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-on-surface">Budget Targets</h2>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Your saved allocation split for this account.
+          </p>
+        </div>
+        <button
+          className="motion-button motion-icon-button inline-flex w-fit items-center gap-2 rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-primary transition hover:border-outline hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-primary/10"
+          type="button"
+          onClick={onEditTargets}
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+            tune
+          </span>
+          Edit Targets
+        </button>
+      </div>
 
-        return (
-          <article
-            className="rounded-lg border border-ecru bg-light-red/10 p-4 shadow-sm"
-            key={card.label}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-bold">{card.label}</h2>
-                <p className="mt-1 text-xs text-black-bean/70">
-                  Target {formatCurrency(card.target)}
+      <div className="mt-4 grid gap-3 xl:grid-cols-3">
+        {cards.map((card, index) => {
+          const isOver = !card.positiveOverTarget && card.remaining < 0;
+          const percent = progressPercent(card.actual, card.target);
+
+          return (
+            <article
+              className={`animate-card-in stagger-${index + 1} motion-card rounded-xl border border-surface-variant bg-surface-container-lowest p-4`}
+              key={card.label}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-on-surface">{card.label}</h3>
+                  <p className="mt-1 text-xs text-on-surface-variant">
+                    Target {formatCurrency(card.target)}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-2.5 py-1 font-label-sm text-label-sm ${
+                    isOver ? "bg-error-container text-error" : "bg-surface-container text-on-surface-variant"
+                  }`}
+                >
+                  {percent}%
+                </span>
+              </div>
+
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-surface-container">
+                <div
+                  className="animate-bar-fill h-full rounded-full bg-primary transition-all duration-500"
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+
+              <div className="mt-4 grid gap-2 text-sm">
+                <p className="flex justify-between gap-3">
+                  <span className="text-on-surface-variant">Actual</span>
+                  <strong className="text-on-surface">{formatCurrency(card.actual)}</strong>
+                </p>
+                <p className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 text-on-surface-variant">{card.remainingLabel}</span>
+                  <strong
+                    className={`shrink-0 whitespace-nowrap text-right ${
+                      isOver ? "text-primary" : "text-on-surface"
+                    }`}
+                  >
+                    {formatCurrency(card.remaining)}
+                  </strong>
                 </p>
               </div>
-              <span
-                className={`rounded-full px-2 py-1 text-xs font-bold ${
-                  isOver ? "bg-light-red/35 text-maroon" : "bg-white text-black-bean"
-                }`}
-              >
-                {percent}%
-              </span>
-            </div>
-
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-white">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  isOver ? "bg-light-red" : "bg-maroon"
-                }`}
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-
-            <div className="mt-4 grid gap-2 text-sm">
-              <p className="flex justify-between gap-3">
-                <span className="text-black-bean/70">Actual</span>
-                <strong>{formatCurrency(card.actual)}</strong>
-              </p>
-              <p className="flex justify-between gap-3">
-                <span className="text-black-bean/70">{card.remainingLabel}</span>
-                <strong className={isOver ? "text-maroon" : ""}>
-                  {formatCurrency(card.remaining)}
-                </strong>
-              </p>
-            </div>
-          </article>
-        );
-      })}
+            </article>
+          );
+        })}
+      </div>
     </section>
   );
 }

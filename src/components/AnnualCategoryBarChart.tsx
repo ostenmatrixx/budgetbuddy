@@ -12,19 +12,22 @@ const categories: Array<{
   label: string;
   className: string;
 }> = [
-  { key: "totalIncome", label: "Income", className: "bg-maroon" },
-  { key: "billsSpent", label: "Essentials", className: "bg-light-red" },
-  { key: "nonEssentialsSpent", label: "Non-Essentials", className: "bg-black-bean" },
-  { key: "savingsSaved", label: "Savings", className: "bg-ecru" }
+  { key: "totalIncome", label: "Income", className: "bg-primary" },
+  { key: "billsSpent", label: "Essentials", className: "bg-secondary" },
+  { key: "nonEssentialsSpent", label: "Non-Essentials", className: "bg-tertiary" },
+  { key: "savingsSaved", label: "Savings", className: "bg-primary-fixed-dim" }
 ];
 
 export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChartProps) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-ecru bg-white p-4 shadow-sm">
+    <section className="app-surface animate-card-in min-w-0 overflow-hidden p-4 md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-bold">Monthly Category Breakdown</h2>
-          <p className="mt-1 text-sm text-black-bean/70">
+        <div className="min-w-0">
+          <p className="text-label-sm font-label-sm uppercase text-outline">By Category</p>
+          <h2 className="mt-1 text-headline-md font-headline-md text-on-surface">
+            Monthly Category Breakdown
+          </h2>
+          <p className="mt-1 text-body-md font-body-md text-on-surface-variant">
             Income, essentials, non-essentials, and savings by month.
           </p>
         </div>
@@ -32,10 +35,10 @@ export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChar
       </div>
 
       <div className="mt-5 w-full overflow-x-auto pb-2">
-        <div className="grid min-w-[620px] grid-cols-12 gap-2 lg:min-w-0">
-          {report.months.map((month) => (
-            <div className="flex flex-col gap-2" key={month.month}>
-              <div className="flex h-56 items-end justify-center gap-1 rounded-lg bg-light-red/5 px-2 py-3">
+        <div className="grid min-w-[680px] grid-cols-12 gap-2.5 lg:min-w-0">
+          {report.months.map((month, monthIndex) => (
+            <div className={`animate-slide-up stagger-${(monthIndex % 6) + 1} flex flex-col gap-2`} key={month.month}>
+              <div className="flex h-56 items-end justify-center gap-1.5 rounded-lg bg-surface-container px-2 py-3 ring-1 ring-surface-variant">
                 {categories.map((category) => {
                   const value = month[category.key];
                   const height = barHeight(value, report.maxChartValue);
@@ -49,14 +52,14 @@ export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChar
                       title={`${category.label}: ${formatCurrency(value)}`}
                     >
                       <span
-                        className={`w-full rounded-t-md transition-all duration-500 ${category.className}`}
-                        style={{ height }}
+                        className={`animate-bar-fill w-full rounded-t-sm transition-all duration-500 ${category.className}`}
+                        style={{ height, animationDelay: `${monthIndex * 35}ms` }}
                       />
                     </div>
                   );
                 })}
               </div>
-              <p className="text-center text-xs font-bold text-black-bean/70">
+              <p className="text-center text-label-sm font-label-sm text-outline">
                 {month.monthLabel}
               </p>
             </div>
@@ -69,7 +72,7 @@ export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChar
 
 function Legend() {
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-black-bean/70">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-surface-variant bg-surface-container-low p-3 text-label-sm font-label-sm text-on-surface-variant">
       {categories.map((category) => (
         <span className="flex items-center gap-2" key={category.key}>
           <span className={`h-2.5 w-2.5 rounded-full ${category.className}`} />

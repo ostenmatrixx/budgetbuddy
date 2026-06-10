@@ -20,58 +20,73 @@ export default function DailyTransactionLog({
   onEdit
 }: DailyTransactionLogProps) {
   return (
-    <section className="rounded-lg border border-ecru bg-light-red/10 p-4 shadow-sm">
+    <section className="app-surface animate-card-in p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold">Daily Log</h2>
-          <p className="text-sm text-black-bean/70">{date}</p>
+          <h2 className="text-lg font-semibold text-on-surface">Daily Log</h2>
+          <p className="text-sm text-on-surface-variant">{date}</p>
         </div>
         <button
-          className="rounded-lg border border-ecru px-3 py-2 text-sm font-bold transition hover:border-maroon hover:text-maroon"
+          className="icon-control motion-icon-button h-9 w-9 shrink-0"
+          aria-label="Close daily log"
+          title="Close daily log"
           type="button"
           onClick={onClose}
         >
-          Close
+          <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+            close
+          </span>
         </button>
       </div>
 
       <div className="mt-4 space-y-3">
         {transactions.length === 0 ? (
-          <p className="rounded-lg bg-white px-3 py-4 text-sm text-black-bean/70">
+          <p className="rounded-lg bg-surface-container-low px-3 py-4 text-sm text-on-surface-variant">
             No entries on this date.
           </p>
         ) : (
           transactions.map((transaction) => (
-            <article className="rounded-lg bg-white p-3 shadow-sm" key={transaction.id}>
+            <article
+              className="animate-slide-up rounded-xl border border-surface-variant bg-surface-container-lowest p-3"
+              key={transaction.id}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.08em] text-maroon">
+                  <p className="font-label-sm text-label-sm uppercase text-primary">
                     {transactionTypeShortLabels[transaction.type]}
                   </p>
-                  <h3 className="mt-1 font-bold">{transaction.description}</h3>
+                  <h3 className="mt-1 font-semibold text-on-surface">{transaction.description}</h3>
                   {transaction.notes ? (
-                    <p className="mt-1 text-sm text-black-bean/70">{transaction.notes}</p>
+                    <p className="mt-1 text-sm text-on-surface-variant">{transaction.notes}</p>
                   ) : null}
-                  <p className="mt-1 text-xs font-semibold text-black-bean/55">
+                  <p className="mt-1 text-xs font-semibold text-outline">
                     {normalizeTransactionSubcategory(transaction)}
                   </p>
                 </div>
-                <strong>{formatCurrency(transaction.amount)}</strong>
+                <strong className="text-on-surface">{formatCurrency(transaction.amount)}</strong>
               </div>
               <div className="mt-3 flex gap-2">
                 <button
-                  className="rounded-lg border border-ecru px-3 py-2 text-sm font-semibold transition hover:border-maroon hover:text-maroon"
+                  aria-label="Edit transaction"
+                  className="icon-control motion-icon-button h-9 w-9"
+                  title="Edit transaction"
                   type="button"
                   onClick={() => onEdit(transaction)}
                 >
-                  Edit
+                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                    edit
+                  </span>
                 </button>
                 <button
-                  className="rounded-lg border border-light-red px-3 py-2 text-sm font-semibold text-maroon transition hover:bg-light-red/25"
+                  aria-label="Delete transaction"
+                  className="motion-icon-button grid h-9 w-9 place-items-center rounded-lg border border-outline-variant bg-surface-container-lowest text-primary transition hover:bg-error-container focus:outline-none focus:ring-2 focus:ring-primary/10"
+                  title="Delete transaction"
                   type="button"
                   onClick={() => onDelete(transaction)}
                 >
-                  Delete
+                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                    delete
+                  </span>
                 </button>
               </div>
             </article>

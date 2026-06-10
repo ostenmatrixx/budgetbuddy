@@ -6,46 +6,49 @@ interface AnnualFlowBarChartProps {
 
 export default function AnnualFlowBarChart({ report }: AnnualFlowBarChartProps) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-ecru bg-white p-4 shadow-sm">
+    <section className="app-surface animate-card-in stagger-1 min-w-0 overflow-hidden p-4 md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-bold">Income vs Outflow</h2>
-          <p className="mt-1 text-sm text-black-bean/70">
+        <div className="min-w-0">
+          <p className="text-label-sm font-label-sm uppercase text-outline">Cash Flow</p>
+          <h2 className="mt-1 text-headline-md font-headline-md text-on-surface">
+            Income vs Outflow
+          </h2>
+          <p className="mt-1 text-body-md font-body-md text-on-surface-variant">
             Outflow includes essentials, non-essentials, and savings.
           </p>
         </div>
-        <div className="flex gap-4 text-xs text-black-bean/70">
+        <div className="flex gap-4 rounded-lg border border-surface-variant bg-surface-container-low p-3 text-label-sm font-label-sm text-on-surface-variant">
           <span className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-maroon" />
+            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
             Income
           </span>
           <span className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-light-red" />
+            <span className="h-2.5 w-2.5 rounded-full bg-secondary" />
             Outflow
           </span>
         </div>
       </div>
 
       <div className="mt-5 w-full overflow-x-auto pb-1">
-        <div className="grid min-w-[620px] gap-3 lg:min-w-0">
-          {report.months.map((month) => (
+        <div className="grid min-w-[680px] gap-3 lg:min-w-0">
+          {report.months.map((month, index) => (
             <div
-              className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3"
+              className={`animate-slide-up stagger-${(index % 6) + 1} grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3`}
               key={month.month}
             >
-              <p className="text-xs font-bold text-black-bean/70">{month.monthLabel}</p>
+              <p className="text-label-sm font-label-sm text-outline">{month.monthLabel}</p>
               <div className="grid gap-1.5">
                 <Bar
                   label={`${month.monthLabel} income`}
                   value={month.totalIncome}
                   max={report.maxChartValue}
-                  className="bg-maroon"
+                  className="bg-primary"
                 />
                 <Bar
                   label={`${month.monthLabel} outflow`}
                   value={month.outflow}
                   max={report.maxChartValue}
-                  className="bg-light-red"
+                  className="bg-secondary"
                 />
               </div>
             </div>
@@ -69,15 +72,15 @@ function Bar({ label, value, max, className }: BarProps) {
   return (
     <div
       aria-label={`${label}: ${formatCurrency(value)}`}
-      className="relative h-7 overflow-hidden rounded-full bg-light-red/5"
+      className="relative h-7 overflow-hidden rounded-full bg-surface-container ring-1 ring-surface-variant"
       role="img"
       title={`${label}: ${formatCurrency(value)}`}
     >
       <span
-        className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${className}`}
+        className={`animate-bar-fill absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${className}`}
         style={{ width }}
       />
-      <span className="absolute inset-y-0 right-3 flex items-center text-xs font-bold text-black-bean">
+      <span className="absolute inset-y-0 right-3 flex items-center text-label-sm font-label-sm text-on-surface">
         {formatCurrency(value)}
       </span>
     </div>

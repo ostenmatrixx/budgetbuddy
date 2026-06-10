@@ -16,10 +16,10 @@ interface CalendarWidgetProps {
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const dotClasses: Record<TransactionType, string> = {
-  income: "bg-maroon",
-  bills: "bg-light-red",
-  non_essentials: "bg-black-bean",
-  savings: "bg-ecru"
+  income: "bg-primary",
+  bills: "bg-primary-fixed-dim",
+  non_essentials: "bg-on-surface",
+  savings: "bg-tertiary"
 };
 
 export default function CalendarWidget({
@@ -42,15 +42,15 @@ export default function CalendarWidget({
   }
 
   return (
-    <section className="rounded-lg border border-ecru bg-white p-4 shadow-sm">
+    <section className="app-surface animate-card-in stagger-3 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold">Calendar</h2>
-          <p className="text-sm text-black-bean/70">Entries by day</p>
+          <h2 className="text-lg font-semibold text-on-surface">Calendar</h2>
+          <p className="text-sm text-on-surface-variant">Entries by day</p>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs font-bold text-black-bean/60">
+      <div className="mt-4 grid grid-cols-7 gap-1 text-center font-label-sm text-label-sm text-outline">
         {weekdays.map((weekday) => (
           <span key={weekday}>{weekday}</span>
         ))}
@@ -59,7 +59,7 @@ export default function CalendarWidget({
       <div className="mt-2 grid grid-cols-7 gap-1">
         {cells.map((day, index) => {
           if (!day) {
-            return <span className="aspect-square rounded-lg bg-light-red/5" key={index} />;
+            return <span className="aspect-square rounded-lg bg-surface-container-low" key={index} />;
           }
 
           const date = toDateKey(year, month, day);
@@ -71,10 +71,10 @@ export default function CalendarWidget({
 
           return (
             <button
-              className={`aspect-square rounded-lg border p-1 text-left text-xs transition hover:border-maroon hover:bg-light-red/10 ${
+              className={`motion-button aspect-square rounded-lg border p-1 text-left text-xs transition hover:border-outline hover:bg-surface-container ${
                 isSelected
-                  ? "border-maroon bg-light-red/15"
-                  : "border-transparent bg-white"
+                  ? "animate-pop border-primary bg-primary text-on-primary shadow-sm"
+                  : "border-transparent bg-surface-container-lowest text-on-surface"
               }`}
               key={date}
               type="button"
@@ -86,7 +86,9 @@ export default function CalendarWidget({
                 {dayTypes.map((type) => (
                   <span
                     aria-label={transactionTypeShortLabels[type]}
-                    className={`h-1.5 w-1.5 rounded-full ${dotClasses[type]}`}
+                    className={`animate-pop h-1.5 w-1.5 rounded-full ${
+                      isSelected ? "bg-on-primary" : dotClasses[type]
+                    }`}
                     key={type}
                   />
                 ))}
@@ -96,7 +98,7 @@ export default function CalendarWidget({
         })}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-black-bean/70">
+      <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-surface-variant bg-surface-container-low p-3 text-xs text-on-surface-variant">
         {transactionTypes.map((type) => (
           <span className="flex items-center gap-2" key={type}>
             <span className={`h-2 w-2 rounded-full ${dotClasses[type]}`} />

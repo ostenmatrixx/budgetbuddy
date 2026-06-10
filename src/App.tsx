@@ -50,8 +50,20 @@ export default function App() {
   if (isLoadingSession) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-white px-4 text-black-bean">
-        <div className="rounded-lg border border-light-red/30 bg-white px-5 py-4 text-sm font-semibold shadow-[0_20px_60px_rgba(166,66,66,0.12)]">
-          Loading your budget...
+        <div className="animate-card-in rounded-xl border border-light-red/30 bg-white px-6 py-5 text-center text-sm font-semibold shadow-[0_20px_60px_rgba(166,66,66,0.12)]">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary-fixed text-primary">
+            <span
+              className="material-symbols-outlined animate-spin-soft text-[26px]"
+              aria-hidden="true"
+            >
+              sync
+            </span>
+          </div>
+          <p className="mt-3">Loading BudgetBuddy...</p>
+          <div className="mt-4 grid gap-2">
+            <span className="animate-shimmer h-2 w-48 rounded-full bg-surface-container" />
+            <span className="animate-shimmer mx-auto h-2 w-32 rounded-full bg-surface-container-low" />
+          </div>
         </div>
       </main>
     );
