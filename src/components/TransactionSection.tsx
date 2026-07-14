@@ -211,7 +211,7 @@ function SubcategoryNav({ groups, selectedLabel, onSelect }: SubcategoryNavProps
               aria-selected={isSelected}
               className={`motion-button rounded-lg px-4 py-2.5 text-left text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                 isSelected
-                  ? "animate-pop bg-white text-primary shadow-sm"
+                  ? "animate-pop bg-surface-container-lowest text-primary shadow-sm"
                   : "text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
               }`}
               key={group.label}
@@ -546,7 +546,7 @@ function TransactionListToolbar({
           <button
             className={`motion-button rounded-md px-2 py-1 font-bold transition ${
               sortOrder === nextSortOrder
-                ? "animate-pop bg-white text-primary shadow-sm"
+                ? "animate-pop bg-surface-container-lowest text-primary shadow-sm"
                 : "text-outline hover:text-primary"
             }`}
             key={nextSortOrder}
@@ -579,7 +579,7 @@ function PaginationFooter({
   return (
     <div className="flex items-center justify-between gap-3 border-t border-surface-variant bg-surface-container-low/50 px-4 py-3 text-xs">
       <button
-        className="motion-button motion-icon-button inline-flex items-center gap-1 rounded-lg border border-surface-variant bg-white px-3 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="motion-button motion-icon-button inline-flex items-center gap-1 rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
         type="button"
         disabled={!hasPreviousPage}
         onClick={() => onPageChange(currentPage - 1)}
@@ -591,7 +591,7 @@ function PaginationFooter({
         Page {currentPage} of {totalPages}
       </span>
       <button
-        className="motion-button motion-icon-button inline-flex items-center gap-1 rounded-lg border border-surface-variant bg-white px-3 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="motion-button motion-icon-button inline-flex items-center gap-1 rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
         type="button"
         disabled={!hasNextPage}
         onClick={() => onPageChange(currentPage + 1)}
@@ -692,8 +692,8 @@ function IconButton({
 }: IconButtonProps) {
   const className =
     variant === "danger"
-      ? "motion-icon-button grid h-9 w-9 place-items-center rounded-lg border border-outline-variant bg-white text-primary transition hover:bg-primary-fixed focus:outline-none focus:ring-2 focus:ring-primary/20"
-      : "motion-icon-button grid h-9 w-9 place-items-center rounded-lg border border-surface-variant bg-white text-on-surface-variant transition hover:border-outline hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
+      ? "motion-icon-button grid h-9 w-9 place-items-center rounded-lg border border-outline-variant bg-surface-container-lowest text-primary transition hover:bg-primary-fixed focus:outline-none focus:ring-2 focus:ring-primary/20"
+      : "motion-icon-button grid h-9 w-9 place-items-center rounded-lg border border-surface-variant bg-surface-container-lowest text-on-surface-variant transition hover:border-outline hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
   return (
     <button

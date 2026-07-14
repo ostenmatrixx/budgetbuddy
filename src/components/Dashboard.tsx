@@ -36,13 +36,16 @@ import DailyTransactionLog from "./DailyTransactionLog";
 import DashboardViewToggle, { type DashboardView } from "./DashboardViewToggle";
 import MonthlySelector from "./MonthlySelector";
 import SummaryCards from "./SummaryCards";
+import ThemeToggle, { type ThemeMode } from "./ThemeToggle";
 import TransactionFormModal from "./TransactionFormModal";
 import TransactionSection from "./TransactionSection";
 
 interface DashboardProps {
+  theme: ThemeMode;
   userId: string;
   userEmail?: string;
   onLogout: () => void | Promise<void>;
+  onToggleTheme: () => void;
 }
 
 interface ModalState {
@@ -51,7 +54,13 @@ interface ModalState {
   date?: string;
 }
 
-export default function Dashboard({ userId, userEmail, onLogout }: DashboardProps) {
+export default function Dashboard({
+  onLogout,
+  onToggleTheme,
+  theme,
+  userId,
+  userEmail
+}: DashboardProps) {
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
@@ -301,6 +310,7 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
               <span className="material-symbols-outlined text-[22px]">tune</span>
               Budget Targets
             </button>
+            <ThemeToggle className="w-full justify-start" theme={theme} onToggle={onToggleTheme} />
           </div>
         </nav>
 
@@ -377,6 +387,13 @@ export default function Dashboard({ userId, userEmail, onLogout }: DashboardProp
               <span className="material-symbols-outlined text-[20px]">add_circle</span>
               <span className="hidden sm:inline">New Transaction</span>
             </button>
+
+            <ThemeToggle
+              compact
+              className="md:hidden"
+              theme={theme}
+              onToggle={onToggleTheme}
+            />
 
             <button
               className="motion-icon-button grid h-10 w-10 place-items-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/10 md:hidden"

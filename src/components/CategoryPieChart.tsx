@@ -37,7 +37,7 @@ export default function CategoryPieChart({ segments }: CategoryPieChartProps) {
               />
             ))}
           </svg>
-          <div className="absolute inset-6 flex flex-col items-center justify-center rounded-full bg-white text-center shadow-[inset_0_0_0_1px_rgba(226,226,228,0.7)]">
+          <div className="absolute inset-6 flex flex-col items-center justify-center rounded-full bg-surface-container-lowest text-center shadow-[inset_0_0_0_1px_rgba(226,226,228,0.7)]">
             <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-outline">
               {total > 0 ? "Top" : "Empty"}
             </span>

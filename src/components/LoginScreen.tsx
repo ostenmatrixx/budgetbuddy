@@ -1,12 +1,19 @@
 import { type CSSProperties, type FormEvent, useState } from "react";
 import { validateAuthInput, type AuthInputErrors, type AuthMode } from "../lib/auth";
 import { getSupabaseClient } from "../lib/supabaseClient";
+import ThemeToggle, { type ThemeMode } from "./ThemeToggle";
 
 interface LoginScreenProps {
   configurationError?: string;
+  theme: ThemeMode;
+  onToggleTheme: () => void;
 }
 
-export default function LoginScreen({ configurationError }: LoginScreenProps) {
+export default function LoginScreen({
+  configurationError,
+  onToggleTheme,
+  theme
+}: LoginScreenProps) {
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -82,6 +89,7 @@ export default function LoginScreen({ configurationError }: LoginScreenProps) {
           </span>
         </div>
         <nav className="flex items-center gap-md" aria-label="Account actions">
+          <ThemeToggle compact theme={theme} onToggle={onToggleTheme} />
           <span className="text-label-md font-label-md text-on-surface-variant">
             Help
           </span>
@@ -300,9 +308,9 @@ export default function LoginScreen({ configurationError }: LoginScreenProps) {
         </form>
 
         <aside className="animate-card-in stagger-3 absolute right-margin-desktop hidden max-w-[320px] -translate-y-1/2 lg:top-1/2 lg:block">
-          <div className="relative aspect-square overflow-hidden rounded-xl border border-surface-variant bg-on-surface shadow-xl">
+          <div className="relative aspect-square overflow-hidden rounded-xl border border-surface-variant bg-black-bean shadow-xl">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.24),transparent_42%)]" />
-            <div className="absolute inset-x-9 top-24 rounded-lg border border-surface-variant/20 bg-on-surface/80 p-md shadow-2xl">
+            <div className="absolute inset-x-9 top-24 rounded-lg border border-surface-variant/20 bg-black-bean/80 p-md shadow-2xl">
               <div className="mb-sm flex items-center gap-xs">
                 <span className="h-2 w-2 rounded-full bg-primary" />
                 <span className="h-2 w-2 rounded-full bg-secondary-container" />

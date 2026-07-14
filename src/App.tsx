@@ -2,12 +2,35 @@ import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Dashboard from "./components/Dashboard";
 import LoginScreen from "./components/LoginScreen";
+import type { ThemeMode } from "./components/ThemeToggle";
 import { getSupabaseClient } from "./lib/supabaseClient";
+
+const themeStorageKey = "budgetbuddy-theme";
+
+function getInitialTheme(): ThemeMode {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  const savedTheme = window.localStorage.getItem(themeStorageKey);
+
+  if (savedTheme === "light" || savedTheme === "dark") {
+    return savedTheme;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [configurationError, setConfigurationError] = useState("");
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem(themeStorageKey, theme);
+  }, [theme]);
 
   useEffect(() => {
     try {
@@ -47,10 +70,14 @@ export default function App() {
     await getSupabaseClient().auth.signOut();
   }
 
+  function toggleTheme() {
+    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  }
+
   if (isLoadingSession) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-white px-4 text-black-bean">
-        <div className="animate-card-in rounded-xl border border-light-red/30 bg-white px-6 py-5 text-center text-sm font-semibold shadow-[0_20px_60px_rgba(166,66,66,0.12)]">
+      <main className="flex min-h-screen items-center justify-center bg-background px-4 text-on-background">
+        <div className="animate-card-in rounded-xl border border-light-red/30 bg-surface-container-lowest px-6 py-5 text-center text-sm font-semibold ambient-shadow">
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary-fixed text-primary">
             <span
               className="material-symbols-outlined animate-spin-soft text-[26px]"
@@ -70,8 +97,14 @@ export default function App() {
   }
 
   return session ? (
-    <Dashboard userId={session.user.id} userEmail={session.user.email} onLogout={handleLogout} />
+    <Dashboard
+      theme={theme}
+      userId={session.user.id}
+      userEmail={session.user.email}
+      onLogout={handleLogout}
+      onToggleTheme={toggleTheme}
+    />
   ) : (
-    <LoginScreen configurationError={configurationError} />
+    <LoginScreen configurationError={configurationError} theme={theme} onToggleTheme={toggleTheme} />
   );
 }
