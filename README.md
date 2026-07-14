@@ -107,6 +107,17 @@ The included `vercel.json` sets:
 - Output directory: `dist`
 - Framework: `vite`
 
+## Install As A Phone App
+
+BudgetBuddy includes Progressive Web App files: a web manifest, install icons, Apple touch icon, and a lightweight service worker.
+
+After deploying to Vercel over HTTPS:
+
+- iPhone/iPad: open the site in Safari, tap Share, then choose **Add to Home Screen**.
+- Android/Chrome: open the site in Chrome and use the browser **Install app** or **Add to Home screen** option.
+
+The service worker caches the app shell so the app can open more reliably. Supabase login and budget data still require internet access unless offline sync is added later.
+
 ## Data Storage
 
 Transactions are stored in Supabase in `public.transactions`. Budget target settings are stored in `public.budget_preferences`. User-managed subcategories are stored in `public.transaction_subcategories`. Row-level security limits each authenticated user to their own rows.
