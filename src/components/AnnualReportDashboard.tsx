@@ -16,10 +16,7 @@ export default function AnnualReportDashboard({
   year,
   onYearChange
 }: AnnualReportDashboardProps) {
-  const report = useMemo(
-    () => calculateAnnualReport(transactions, year),
-    [transactions, year]
-  );
+  const report = useMemo(() => calculateAnnualReport(transactions, year), [transactions, year]);
 
   return (
     <section className="animate-screen-in flex flex-col gap-5">

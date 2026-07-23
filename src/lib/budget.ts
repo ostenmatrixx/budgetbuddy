@@ -1,4 +1,7 @@
 import {
+  TRANSACTION_DESCRIPTION_MAX_LENGTH,
+  TRANSACTION_NOTES_MAX_LENGTH,
+  TRANSACTION_SUBCATEGORY_MAX_LENGTH,
   transactionTypes,
   type Transaction,
   type TransactionSubcategoriesByType,
@@ -104,7 +107,6 @@ export const DEFAULT_BUDGET_PREFERENCES: BudgetPreference = {
 
 export const UNCATEGORIZED_SUBCATEGORY_LABEL = "Uncategorized";
 export const TRANSACTION_PAGE_SIZE = 5;
-export const DEFAULT_CURRENCY = import.meta.env.VITE_BUDGET_CURRENCY || "PHP";
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const shortMonthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
@@ -137,9 +139,7 @@ export function calculateBudgetSummary(
   const remainingIncome = toMoney(totalIncome - billsSpent - nonEssentialsSpent - savingsSaved);
   const essentialsTarget = toMoney(totalIncome * (budgetPreference.essentialsPercent / 100));
   const savingsTarget = toMoney(totalIncome * (budgetPreference.savingsPercent / 100));
-  const nonEssentialsTarget = toMoney(
-    totalIncome * (budgetPreference.nonEssentialsPercent / 100)
-  );
+  const nonEssentialsTarget = toMoney(totalIncome * (budgetPreference.nonEssentialsPercent / 100));
 
   return {
     totalIncome,
@@ -221,11 +221,7 @@ export function balanceBudgetPreference(
 }
 
 export function getBudgetPreferenceTotal(preference: BudgetPreference): number {
-  return (
-    preference.essentialsPercent +
-    preference.savingsPercent +
-    preference.nonEssentialsPercent
-  );
+  return preference.essentialsPercent + preference.savingsPercent + preference.nonEssentialsPercent;
 }
 
 export function sortTransactionsForDisplay(
@@ -357,9 +353,9 @@ export function calculateCategoryPieSegments(
   );
 
   return Array.from(totalsByCategory.entries()).map(([label, value]) => ({
-      label,
-      value,
-      percentage: total > 0 ? Math.round((value / total) * 100) : 0
+    label,
+    value,
+    percentage: total > 0 ? Math.round((value / total) * 100) : 0
   }));
 }
 
@@ -407,9 +403,7 @@ export function calculateSubcategoryGroups(
 
     return {
       label,
-      total: toMoney(
-        groupTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
-      ),
+      total: toMoney(groupTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)),
       transactions: groupTransactions
     };
   });
@@ -456,6 +450,16 @@ export function validateTransactionInput(
 
   if (!description) {
     errors.description = "Add a short description.";
+  } else if (description.length > TRANSACTION_DESCRIPTION_MAX_LENGTH) {
+    errors.description = `Use ${TRANSACTION_DESCRIPTION_MAX_LENGTH} characters or fewer.`;
+  }
+
+  if (notes.length > TRANSACTION_NOTES_MAX_LENGTH) {
+    errors.notes = `Use ${TRANSACTION_NOTES_MAX_LENGTH.toLocaleString("en-US")} characters or fewer.`;
+  }
+
+  if (subcategory.length > TRANSACTION_SUBCATEGORY_MAX_LENGTH) {
+    errors.subcategory = `Use ${TRANSACTION_SUBCATEGORY_MAX_LENGTH} characters or fewer.`;
   }
 
   if (isTransactionType(type)) {
@@ -464,7 +468,7 @@ export function validateTransactionInput(
       subcategoriesByType &&
       !isActiveSubcategoryForType(subcategoriesByType, type, subcategory)
     ) {
-      errors.subcategory = "Choose a valid subcategory.";
+      errors.subcategory ??= "Choose a valid subcategory.";
     }
   }
 
@@ -481,11 +485,7 @@ export function validateTransactionInput(
   };
 
   if (subcategory) {
-    value.subcategory = getCanonicalSubcategoryName(
-      subcategoriesByType,
-      value.type,
-      subcategory
-    );
+    value.subcategory = getCanonicalSubcategoryName(subcategoriesByType, value.type, subcategory);
   }
 
   return {
@@ -493,15 +493,6 @@ export function validateTransactionInput(
     errors: {},
     value
   };
-}
-
-export function formatCurrency(value: number, currency = DEFAULT_CURRENCY): string {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value);
 }
 
 export function progressPercent(actual: number, target: number): number {
@@ -561,9 +552,7 @@ function isActiveSubcategoryForType(
   const subcategoryKey = createSubcategoryKey(subcategory);
 
   return (subcategoriesByType[type] ?? []).some(
-    (option) =>
-      option.isActive &&
-      createSubcategoryKey(option.name) === subcategoryKey
+    (option) => option.isActive && createSubcategoryKey(option.name) === subcategoryKey
   );
 }
 
@@ -574,9 +563,7 @@ function getCanonicalSubcategoryName(
 ): string {
   const subcategoryKey = createSubcategoryKey(subcategory);
   const matchedOption = (subcategoriesByType?.[type] ?? []).find(
-    (option) =>
-      option.isActive &&
-      createSubcategoryKey(option.name) === subcategoryKey
+    (option) => option.isActive && createSubcategoryKey(option.name) === subcategoryKey
   );
 
   return matchedOption ? normalizeSubcategoryLabel(matchedOption.name) : subcategory;
@@ -594,10 +581,7 @@ function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value));
 }
 
-function createAnnualMonthReport(
-  month: number,
-  transactions: Transaction[]
-): AnnualMonthReport {
+function createAnnualMonthReport(month: number, transactions: Transaction[]): AnnualMonthReport {
   const totalIncome = sumByType(transactions, "income");
   const billsSpent = sumByType(transactions, "bills");
   const nonEssentialsSpent = sumByType(transactions, "non_essentials");

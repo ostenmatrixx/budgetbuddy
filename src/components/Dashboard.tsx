@@ -1,23 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
+import { useUserSettings } from "../contexts/UserSettingsContext";
+import { usePwaStatus } from "../hooks/usePwaStatus";
 import {
   DEFAULT_BUDGET_PREFERENCES,
   calculateAnnualReport,
   calculateCategoryPieSegments,
   calculateBudgetSummary,
   filterTransactionsByMonth,
-  formatCurrency,
   getMonthName,
   type BudgetPreference
 } from "../lib/budget";
+import { toDateInputValue } from "../lib/date";
 import {
   addTransactionSubcategory,
   archiveTransactionSubcategory,
   addTransaction,
   deleteTransaction,
+  getAccountBalance,
   loadBudgetPreference,
   loadTransactionSubcategories,
   loadTransactions,
   saveBudgetPreference,
+  TransactionConflictError,
   updateTransaction
 } from "../lib/storage";
 import {
@@ -29,12 +33,16 @@ import {
   type TransactionType
 } from "../types/transaction";
 import AnnualReportDashboard from "./AnnualReportDashboard";
+import AccessibleDialog from "./AccessibleDialog";
+import AccountSettingsPanel from "./AccountSettingsPanel";
 import BudgetAllocationCards from "./BudgetAllocationCards";
 import BudgetPreferenceEditor from "./BudgetPreferenceEditor";
 import CalendarWidget from "./CalendarWidget";
+import ConfirmDialog from "./ConfirmDialog";
 import DailyTransactionLog from "./DailyTransactionLog";
 import DashboardViewToggle, { type DashboardView } from "./DashboardViewToggle";
 import MonthlySelector from "./MonthlySelector";
+import PwaInstallPrompt from "./PwaInstallPrompt";
 import SummaryCards from "./SummaryCards";
 import ThemeToggle, { type ThemeMode } from "./ThemeToggle";
 import TransactionFormModal from "./TransactionFormModal";
@@ -52,6 +60,13 @@ interface ModalState {
   type?: TransactionType;
   transaction?: Transaction;
   date?: string;
+  clientRequestId?: string;
+}
+
+function createTransactionModalState(
+  values: Omit<ModalState, "clientRequestId" | "transaction"> = {}
+): ModalState {
+  return { ...values, clientRequestId: crypto.randomUUID() };
 }
 
 export default function Dashboard({
@@ -61,11 +76,14 @@ export default function Dashboard({
   userId,
   userEmail
 }: DashboardProps) {
-  const today = new Date();
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const { currencySymbol, formatCurrency, settings } = useUserSettings();
+  const { isOffline } = usePwaStatus();
+  const initialPeriod = getCurrentPeriod(settings.timeZone);
+  const [selectedYear, setSelectedYear] = useState(initialPeriod.year);
+  const [selectedMonth, setSelectedMonth] = useState(initialPeriod.month);
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [totalBalance, setTotalBalance] = useState(0);
   const [transactionSubcategories, setTransactionSubcategories] = useState<
     TransactionSubcategoryOption[]
   >([]);
@@ -78,6 +96,19 @@ export default function Dashboard({
   const [modalState, setModalState] = useState<ModalState | null>(null);
   const [view, setView] = useState<DashboardView>("monthly");
   const [isBudgetEditorOpen, setIsBudgetEditorOpen] = useState(false);
+  const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
+  const [isAccountSettingsBusy, setIsAccountSettingsBusy] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [hasCreatedTransaction, setHasCreatedTransaction] = useState(false);
+
+  useEffect(() => {
+    const period = getCurrentPeriod(settings.timeZone);
+    setSelectedYear(period.year);
+    setSelectedMonth(period.month);
+    setSelectedDate(undefined);
+  }, [settings.timeZone]);
 
   useEffect(() => {
     let isActive = true;
@@ -90,17 +121,20 @@ export default function Dashboard({
         const [
           nextTransactions,
           nextBudgetPreference,
-          nextTransactionSubcategories
+          nextTransactionSubcategories,
+          nextTotalBalance
         ] = await Promise.all([
-          loadTransactions(userId),
+          loadTransactions(userId, selectedYear),
           loadBudgetPreference(userId),
-          loadTransactionSubcategories(userId)
+          loadTransactionSubcategories(userId),
+          getAccountBalance()
         ]);
 
         if (isActive) {
           setTransactions(nextTransactions);
           setBudgetPreference(nextBudgetPreference);
           setTransactionSubcategories(nextTransactionSubcategories);
+          setTotalBalance(nextTotalBalance);
         }
       } catch (error) {
         if (isActive) {
@@ -120,7 +154,7 @@ export default function Dashboard({
     return () => {
       isActive = false;
     };
-  }, [userId]);
+  }, [selectedYear, userId]);
 
   const monthlyTransactions = useMemo(
     () => filterTransactionsByMonth(transactions, selectedYear, selectedMonth),
@@ -129,13 +163,10 @@ export default function Dashboard({
 
   const subcategoriesByType = useMemo(
     () =>
-      transactionSubcategories.reduce<TransactionSubcategoriesByType>(
-        (groups, subcategory) => {
-          groups[subcategory.type] = [...(groups[subcategory.type] ?? []), subcategory];
-          return groups;
-        },
-        {}
-      ),
+      transactionSubcategories.reduce<TransactionSubcategoriesByType>((groups, subcategory) => {
+        groups[subcategory.type] = [...(groups[subcategory.type] ?? []), subcategory];
+        return groups;
+      }, {}),
     [transactionSubcategories]
   );
 
@@ -147,18 +178,6 @@ export default function Dashboard({
   const annualTopbarSummary = useMemo(
     () => calculateAnnualReport(transactions, selectedYear),
     [transactions, selectedYear]
-  );
-
-  const totalBalance = useMemo(
-    () =>
-      transactions.reduce((balance, transaction) => {
-        if (transaction.type === "income") {
-          return balance + transaction.amount;
-        }
-
-        return balance - transaction.amount;
-      }, 0),
-    [transactions]
   );
 
   const activeTitle = view === "monthly" ? "Monthly Dashboard" : "Annual Report";
@@ -178,9 +197,14 @@ export default function Dashboard({
     [selectedDate, transactions]
   );
 
-  async function refreshTransactions() {
-    const nextTransactions = await loadTransactions(userId);
+  async function refreshTransactions(): Promise<Transaction[]> {
+    const [nextTransactions, nextTotalBalance] = await Promise.all([
+      loadTransactions(userId, selectedYear),
+      getAccountBalance()
+    ]);
     setTransactions(nextTransactions);
+    setTotalBalance(nextTotalBalance);
+    return nextTransactions;
   }
 
   async function refreshSubcategories() {
@@ -189,40 +213,99 @@ export default function Dashboard({
   }
 
   async function handleSaveTransaction(draft: TransactionDraft) {
+    if (isOffline) {
+      throw new Error("Reconnect to save this transaction.");
+    }
+
     setDataError("");
+    const isNewTransaction = !modalState?.transaction;
 
     try {
       if (modalState?.transaction) {
-        await updateTransaction(userId, modalState.transaction.id, draft);
+        await updateTransaction(
+          userId,
+          modalState.transaction.id,
+          draft,
+          modalState.transaction.version
+        );
       } else {
-        await addTransaction(userId, draft);
+        await addTransaction(userId, draft, modalState?.clientRequestId ?? crypto.randomUUID());
       }
 
       await refreshTransactions();
+      if (isNewTransaction) {
+        setHasCreatedTransaction(true);
+      }
       setModalState(null);
     } catch (error) {
-      setDataError(error instanceof Error ? error.message : "Unable to save this transaction.");
+      let message = error instanceof Error ? error.message : "Unable to save this transaction.";
+
+      if (error instanceof TransactionConflictError && modalState?.transaction) {
+        const latestTransactions = await refreshTransactions();
+        const latestTransaction = latestTransactions.find(
+          (transaction) => transaction.id === modalState.transaction?.id
+        );
+
+        setModalState(latestTransaction ? { transaction: latestTransaction } : null);
+        message = latestTransaction
+          ? `${message} The latest saved version is now loaded.`
+          : "This transaction was deleted on another device. The dashboard has been refreshed.";
+      }
+
+      setDataError(message);
+      throw new Error(message);
     }
   }
 
-  async function handleDeleteTransaction(transaction: Transaction) {
-    const confirmed = window.confirm(`Delete "${transaction.description}"?`);
+  function handleDeleteTransaction(transaction: Transaction) {
+    setDeleteError("");
+    setTransactionToDelete(transaction);
+  }
 
-    if (!confirmed) {
+  async function handleConfirmDeleteTransaction() {
+    if (!transactionToDelete) {
+      return;
+    }
+
+    if (isOffline) {
+      setDeleteError("Reconnect to delete this transaction.");
       return;
     }
 
     setDataError("");
-
+    setDeleteError("");
+    setIsDeletingTransaction(true);
     try {
-      await deleteTransaction(transaction.id);
+      await deleteTransaction(userId, transactionToDelete.id, transactionToDelete.version);
       await refreshTransactions();
+      setTransactionToDelete(null);
     } catch (error) {
-      setDataError(error instanceof Error ? error.message : "Unable to delete this transaction.");
+      let message = error instanceof Error ? error.message : "Unable to delete this transaction.";
+
+      if (error instanceof TransactionConflictError) {
+        const latestTransactions = await refreshTransactions();
+        const latestTransaction = latestTransactions.find(
+          (transaction) => transaction.id === transactionToDelete.id
+        );
+
+        setTransactionToDelete(latestTransaction ?? null);
+        message = latestTransaction
+          ? `${message} Review the latest saved version before deleting it.`
+          : "This transaction was already deleted on another device.";
+      }
+
+      setDataError(message);
+      setDeleteError(message);
+    } finally {
+      setIsDeletingTransaction(false);
     }
   }
 
   async function handleSaveBudgetPreference(nextPreference: BudgetPreference) {
+    if (isOffline) {
+      throw new Error("Reconnect to save budget targets.");
+    }
+
     setDataError("");
     setIsSavingBudgetPreference(true);
 
@@ -239,6 +322,10 @@ export default function Dashboard({
   }
 
   async function handleAddSubcategory(type: TransactionType, name: string) {
+    if (isOffline) {
+      throw new Error("Reconnect to add a subcategory.");
+    }
+
     setDataError("");
 
     try {
@@ -252,10 +339,8 @@ export default function Dashboard({
   }
 
   async function handleArchiveSubcategory(subcategory: TransactionSubcategoryOption) {
-    const confirmed = window.confirm(`Archive "${subcategory.name}"? Existing entries stay visible.`);
-
-    if (!confirmed) {
-      return;
+    if (isOffline) {
+      throw new Error("Reconnect to archive a subcategory.");
     }
 
     setDataError("");
@@ -284,6 +369,12 @@ export default function Dashboard({
 
   return (
     <main className="animate-screen-in min-h-screen bg-surface-bright text-on-surface">
+      <a
+        className="sr-only z-[100] rounded-lg bg-primary px-4 py-3 font-bold text-on-primary focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        href="#dashboard-content"
+      >
+        Skip to dashboard content
+      </a>
       <aside className="animate-slide-up fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r border-surface-variant bg-surface-container-lowest md:flex">
         <div className="flex shrink-0 items-center gap-3 p-6">
           <span
@@ -304,11 +395,22 @@ export default function Dashboard({
             </p>
             <button
               className="motion-nav-item flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"
+              disabled={isOffline}
               type="button"
               onClick={() => setIsBudgetEditorOpen(true)}
             >
               <span className="material-symbols-outlined text-[22px]">tune</span>
               Budget Targets
+            </button>
+            <button
+              className="motion-nav-item flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"
+              type="button"
+              onClick={() => setIsAccountSettingsOpen(true)}
+            >
+              <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
+                manage_accounts
+              </span>
+              Account Settings
             </button>
             <ThemeToggle className="w-full justify-start" theme={theme} onToggle={onToggleTheme} />
           </div>
@@ -320,11 +422,21 @@ export default function Dashboard({
               {userInitial}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">BudgetBuddy user</p>
               {userEmail ? (
-                <p className="truncate text-xs font-semibold text-outline">{userEmail}</p>
+                <p className="truncate text-sm font-semibold text-on-surface">{userEmail}</p>
               ) : null}
             </div>
+            <button
+              aria-label="Account settings"
+              className="motion-icon-button grid h-9 w-9 shrink-0 place-items-center rounded-lg text-outline transition hover:bg-surface-container-lowest hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
+              title="Account settings"
+              type="button"
+              onClick={() => setIsAccountSettingsOpen(true)}
+            >
+              <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
+                settings
+              </span>
+            </button>
             <button
               className="motion-icon-button grid h-9 w-9 shrink-0 place-items-center rounded-lg text-outline transition hover:bg-surface-container-lowest hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
               type="button"
@@ -380,20 +492,30 @@ export default function Dashboard({
             </button>
 
             <button
+              aria-label="New transaction"
               className="motion-button motion-icon-button flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-on-primary ambient-shadow transition active:scale-95 hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={isOffline}
+              title={isOffline ? "Reconnect to add a transaction" : "New transaction"}
               type="button"
-              onClick={() => setModalState({})}
+              onClick={() => setModalState(createTransactionModalState())}
             >
               <span className="material-symbols-outlined text-[20px]">add_circle</span>
               <span className="hidden sm:inline">New Transaction</span>
             </button>
 
-            <ThemeToggle
-              compact
-              className="md:hidden"
-              theme={theme}
-              onToggle={onToggleTheme}
-            />
+            <ThemeToggle compact className="md:hidden" theme={theme} onToggle={onToggleTheme} />
+
+            <button
+              aria-label="Account settings"
+              className="motion-icon-button grid h-10 w-10 place-items-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/10 md:hidden"
+              title="Account settings"
+              type="button"
+              onClick={() => setIsAccountSettingsOpen(true)}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                settings
+              </span>
+            </button>
 
             <button
               className="motion-icon-button grid h-10 w-10 place-items-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/10 md:hidden"
@@ -407,7 +529,11 @@ export default function Dashboard({
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-4 py-5 md:px-6 md:pb-8 md:pt-[5.5rem]">
+        <div
+          className="flex-1 overflow-y-auto px-4 py-5 md:px-6 md:pb-8 md:pt-[5.5rem]"
+          id="dashboard-content"
+          tabIndex={-1}
+        >
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
             <div className="rounded-xl border border-surface-variant bg-surface-container-lowest p-4 ambient-shadow lg:hidden">
               <DashboardViewToggle view={view} onChange={handleViewChange} />
@@ -429,17 +555,23 @@ export default function Dashboard({
             </section>
 
             {dataError ? (
-              <div className="rounded-lg border border-light-red/40 bg-error-container px-4 py-3 text-sm font-semibold text-on-error-container">
+              <div
+                className="rounded-lg border border-light-red/40 bg-error-container px-4 py-3 text-sm font-semibold text-on-error-container"
+                role="alert"
+              >
                 {dataError}
               </div>
             ) : null}
 
-            {isLoadingTransactions ? (
-              <LoadingTransactionsState />
-            ) : null}
+            <PwaInstallPrompt eligible={hasCreatedTransaction} />
+
+            {isLoadingTransactions ? <LoadingTransactionsState /> : null}
 
             {!isLoadingTransactions && view === "monthly" ? (
-              <div className="animate-screen-in grid gap-6" key={`monthly-${selectedYear}-${selectedMonth}`}>
+              <div
+                className="animate-screen-in grid gap-6"
+                key={`monthly-${selectedYear}-${selectedMonth}`}
+              >
                 <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
                   <div className="flex flex-col gap-5">
                     <MonthlySelector
@@ -449,6 +581,7 @@ export default function Dashboard({
                     />
                     <SummaryCards summary={summary} />
                     <BudgetAllocationCards
+                      isWriteDisabled={isOffline}
                       preference={budgetPreference}
                       summary={summary}
                       onEditTargets={() => setIsBudgetEditorOpen(true)}
@@ -456,6 +589,7 @@ export default function Dashboard({
                   </div>
                   <div className="flex flex-col gap-4">
                     <CalendarWidget
+                      locale={settings.locale}
                       month={selectedMonth}
                       year={selectedYear}
                       selectedDate={selectedDate}
@@ -465,6 +599,7 @@ export default function Dashboard({
                     {selectedDate ? (
                       <DailyTransactionLog
                         date={selectedDate}
+                        isWriteDisabled={isOffline}
                         transactions={selectedDateTransactions}
                         onClose={() => setSelectedDate(undefined)}
                         onDelete={handleDeleteTransaction}
@@ -477,6 +612,7 @@ export default function Dashboard({
                 <section className="grid gap-5 lg:grid-cols-2">
                   {transactionTypes.map((type, index) => (
                     <TransactionSection
+                      isWriteDisabled={isOffline}
                       key={type}
                       type={type}
                       year={selectedYear}
@@ -491,7 +627,7 @@ export default function Dashboard({
                         type
                       )}
                       subcategoriesByType={subcategoriesByType}
-                      onAdd={() => setModalState({ type })}
+                      onAdd={() => setModalState(createTransactionModalState({ type }))}
                       onAddSubcategory={handleAddSubcategory}
                       onArchiveSubcategory={handleArchiveSubcategory}
                       onDelete={handleDeleteTransaction}
@@ -521,10 +657,18 @@ export default function Dashboard({
 
       {modalState ? (
         <TransactionFormModal
+          key={
+            modalState.transaction
+              ? `${modalState.transaction.id}-${modalState.transaction.version}`
+              : modalState.clientRequestId
+          }
+          currencySymbol={currencySymbol}
           defaultDate={modalState.date}
           initialType={modalState.type}
+          isWriteDisabled={isOffline}
           transaction={modalState.transaction}
           subcategoriesByType={subcategoriesByType}
+          timeZone={settings.timeZone}
           onClose={() => setModalState(null)}
           onSubmit={handleSaveTransaction}
         />
@@ -532,14 +676,75 @@ export default function Dashboard({
 
       {isBudgetEditorOpen ? (
         <BudgetPreferenceEditor
+          isWriteDisabled={isOffline}
           isSaving={isSavingBudgetPreference}
           preference={budgetPreference}
           onClose={() => setIsBudgetEditorOpen(false)}
           onSave={handleSaveBudgetPreference}
         />
       ) : null}
+
+      <ConfirmDialog
+        confirmLabel="Delete transaction"
+        description={
+          transactionToDelete
+            ? `Delete “${transactionToDelete.description}”? This cannot be undone.`
+            : "Delete this transaction? This cannot be undone."
+        }
+        errorMessage={deleteError || undefined}
+        isOpen={transactionToDelete !== null}
+        isPending={isDeletingTransaction}
+        title="Delete transaction?"
+        variant="danger"
+        onCancel={() => {
+          if (!isDeletingTransaction) {
+            setTransactionToDelete(null);
+            setDeleteError("");
+          }
+        }}
+        onConfirm={handleConfirmDeleteTransaction}
+      />
+
+      <AccessibleDialog
+        className="animate-modal-in max-h-[calc(100svh-2rem)] w-full overflow-y-auto rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_24px_90px_rgba(50,24,24,0.24)] sm:max-w-2xl"
+        descriptionId="account-settings-description"
+        isCloseBlocked={isAccountSettingsBusy}
+        labelId="account-settings-title"
+        open={isAccountSettingsOpen}
+        onRequestClose={() => setIsAccountSettingsOpen(false)}
+      >
+        <div className="mb-2 flex justify-end">
+          <button
+            aria-label="Close account settings"
+            className="icon-control motion-icon-button"
+            disabled={isAccountSettingsBusy}
+            title="Close"
+            type="button"
+            onClick={() => setIsAccountSettingsOpen(false)}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              close
+            </span>
+          </button>
+        </div>
+        {isAccountSettingsOpen && userEmail ? (
+          <AccountSettingsPanel
+            isOffline={isOffline}
+            pwaActions={<PwaInstallPrompt showWhenDismissed variant="settings" />}
+            userEmail={userEmail}
+            userId={userId}
+            onAccountDeleted={onLogout}
+            onBusyChange={setIsAccountSettingsBusy}
+          />
+        ) : null}
+      </AccessibleDialog>
     </main>
   );
+}
+
+function getCurrentPeriod(timeZone: string): { month: number; year: number } {
+  const [year, month] = toDateInputValue(new Date(), timeZone).split("-").map(Number);
+  return { month, year };
 }
 
 function LoadingTransactionsState() {

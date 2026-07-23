@@ -6,6 +6,7 @@ import {
 } from "../types/transaction";
 
 interface CalendarWidgetProps {
+  locale?: string;
   month: number;
   year: number;
   selectedDate?: string;
@@ -23,6 +24,7 @@ const dotClasses: Record<TransactionType, string> = {
 };
 
 export default function CalendarWidget({
+  locale = "en-PH",
   month,
   year,
   selectedDate,
@@ -42,7 +44,10 @@ export default function CalendarWidget({
   }
 
   return (
-    <section className="app-surface animate-card-in stagger-3 p-4">
+    <section
+      className="app-surface animate-card-in stagger-3 p-4"
+      aria-label="Transaction calendar"
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-on-surface">Calendar</h2>
@@ -52,14 +57,22 @@ export default function CalendarWidget({
 
       <div className="mt-4 grid grid-cols-7 gap-1 text-center font-label-sm text-label-sm text-outline">
         {weekdays.map((weekday) => (
-          <span key={weekday}>{weekday}</span>
+          <span aria-hidden="true" key={weekday}>
+            {weekday}
+          </span>
         ))}
       </div>
 
       <div className="mt-2 grid grid-cols-7 gap-1">
         {cells.map((day, index) => {
           if (!day) {
-            return <span className="aspect-square rounded-lg bg-surface-container-low" key={index} />;
+            return (
+              <span
+                aria-hidden="true"
+                className="aspect-square rounded-lg bg-surface-container-low"
+                key={index}
+              />
+            );
           }
 
           const date = toDateKey(year, month, day);
@@ -68,10 +81,21 @@ export default function CalendarWidget({
             dayEntries.some((transaction) => transaction.type === type)
           );
           const isSelected = selectedDate === date;
+          const typeLabels = dayTypes.map((type) => transactionTypeShortLabels[type]);
+          const countLabel = `${dayEntries.length} ${dayEntries.length === 1 ? "entry" : "entries"}`;
+          const accessibleLabel = [
+            formatAccessibleDate(year, month, day, locale),
+            countLabel,
+            typeLabels.length > 0 ? typeLabels.join(", ") : undefined
+          ]
+            .filter(Boolean)
+            .join("; ");
 
           return (
             <button
-              className={`motion-button aspect-square rounded-lg border p-1 text-left text-xs transition hover:border-outline hover:bg-surface-container ${
+              aria-label={accessibleLabel}
+              aria-pressed={isSelected}
+              className={`motion-button aspect-square min-h-11 rounded-lg border p-1 text-left text-xs transition hover:border-outline hover:bg-surface-container ${
                 isSelected
                   ? "animate-pop border-primary bg-primary text-on-primary shadow-sm"
                   : "border-transparent bg-surface-container-lowest text-on-surface"
@@ -79,13 +103,13 @@ export default function CalendarWidget({
               key={date}
               type="button"
               onClick={() => onSelectDate(date)}
-              title={`${dayEntries.length} entries`}
+              title={accessibleLabel}
             >
               <span className="font-bold">{day}</span>
               <span className="mt-1 flex flex-wrap gap-0.5">
                 {dayTypes.map((type) => (
                   <span
-                    aria-label={transactionTypeShortLabels[type]}
+                    aria-hidden="true"
                     className={`animate-pop h-1.5 w-1.5 rounded-full ${
                       isSelected ? "bg-on-primary" : dotClasses[type]
                     }`}
@@ -108,6 +132,16 @@ export default function CalendarWidget({
       </div>
     </section>
   );
+}
+
+function formatAccessibleDate(year: number, month: number, day: number, locale: string): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: "UTC" }).format(
+      new Date(Date.UTC(year, month - 1, day, 12))
+    );
+  } catch {
+    return toDateKey(year, month, day);
+  }
 }
 
 function toDateKey(year: number, month: number, day: number): string {

@@ -1,10 +1,12 @@
-import { formatCurrency, type BudgetSummary } from "../lib/budget";
+import { useUserSettings } from "../contexts/UserSettingsContext";
+import { type BudgetSummary } from "../lib/budget";
 
 interface SummaryCardsProps {
   summary: BudgetSummary;
 }
 
 export default function SummaryCards({ summary }: SummaryCardsProps) {
+  const { formatCurrency } = useUserSettings();
   const items = [
     { label: "Income", value: summary.totalIncome, tone: "primary" },
     { label: "Essentials", value: summary.billsSpent },
@@ -32,9 +34,7 @@ export default function SummaryCards({ summary }: SummaryCardsProps) {
           }`}
           key={item.label}
         >
-          <p className="font-label-sm text-label-sm uppercase text-outline">
-            {item.label}
-          </p>
+          <p className="font-label-sm text-label-sm uppercase text-outline">{item.label}</p>
           <p
             className={`mt-2 text-2xl font-bold leading-8 ${
               item.alert || item.tone === "primary" ? "text-primary" : "text-on-surface"

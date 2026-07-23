@@ -1,3 +1,29 @@
+@font-face {
+  font-family: "Material Symbols Outlined";
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url("./assets/material-symbols-outlined-subset.woff2") format("woff2");
+}
+
+.material-symbols-outlined {
+  display: inline-block;
+  direction: ltr;
+  font-family: "Material Symbols Outlined";
+  font-size: 24px;
+  font-style: normal;
+  font-weight: normal;
+  font-feature-settings: "liga";
+  letter-spacing: normal;
+  line-height: 1;
+  text-rendering: optimizeLegibility;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -44,7 +70,12 @@
   color: rgb(var(--color-on-surface));
   background: rgb(var(--color-background));
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -107,6 +138,214 @@ body {
   transition:
     background-color 180ms ease,
     color 180ms ease;
+}
+
+html.has-open-dialog {
+  overflow: hidden;
+}
+
+.accessible-dialog {
+  color: inherit;
+  margin: auto;
+  max-width: calc(100vw - 1.5rem);
+}
+
+.accessible-dialog::backdrop {
+  animation: fade-in 180ms ease-out both;
+  background: rgb(var(--color-black-bean) / 45%);
+  backdrop-filter: blur(2px);
+}
+
+.accessible-dialog:focus {
+  outline: none;
+}
+
+.confirm-dialog {
+  background: rgb(var(--color-surface-container-lowest));
+  border: 1px solid rgb(var(--color-surface-variant));
+  border-radius: 1rem;
+  box-shadow: 0 24px 90px rgb(50 24 24 / 24%);
+  padding: 0;
+  width: min(28rem, calc(100vw - 1.5rem));
+}
+
+.confirm-dialog-content {
+  padding: 1.5rem;
+}
+
+.confirm-dialog-content h2 {
+  color: rgb(var(--color-on-surface));
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.confirm-dialog-content > p {
+  color: rgb(var(--color-on-surface-variant));
+  line-height: 1.5;
+  margin: 0.75rem 0 0;
+}
+
+.confirm-dialog-content .confirm-dialog-error {
+  background: rgb(var(--color-error-container));
+  border-radius: 0.6rem;
+  color: rgb(var(--color-error));
+  font-weight: 600;
+  padding: 0.75rem;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.confirm-dialog-actions button,
+.pwa-banner button,
+.pwa-install-actions button,
+.error-boundary button {
+  border: 1px solid rgb(var(--color-surface-variant));
+  border-radius: 0.6rem;
+  min-height: 2.75rem;
+  padding: 0.6rem 1rem;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.confirm-dialog-actions button:focus-visible,
+.pwa-banner button:focus-visible,
+.pwa-install-actions button:focus-visible,
+.error-boundary button:focus-visible {
+  outline: 3px solid rgb(var(--color-primary) / 25%);
+  outline-offset: 2px;
+}
+
+.confirm-dialog-actions .is-danger,
+.confirm-dialog-actions .is-primary,
+.pwa-banner button,
+.pwa-install-actions button:not(.is-secondary),
+.error-boundary button {
+  background: rgb(var(--color-primary));
+  border-color: rgb(var(--color-primary));
+  color: rgb(var(--color-on-primary));
+  font-weight: 700;
+}
+
+.confirm-dialog-actions button:disabled,
+.pwa-banner button:disabled,
+.pwa-install-actions button:disabled {
+  opacity: 0.6;
+}
+
+.pwa-banner-stack {
+  display: grid;
+  gap: 0.5rem;
+  left: 50%;
+  max-width: 48rem;
+  padding: 0 0.75rem;
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  transform: translateX(-50%);
+  width: 100%;
+  z-index: 60;
+}
+
+.pwa-banner {
+  align-items: center;
+  background: rgb(var(--color-surface-container-lowest));
+  border: 1px solid rgb(var(--color-surface-variant));
+  border-radius: 0.8rem;
+  box-shadow: var(--ambient-shadow);
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto 1fr auto;
+  padding: 0.75rem;
+}
+
+.pwa-banner p,
+.pwa-install-prompt p {
+  color: rgb(var(--color-on-surface-variant));
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin: 0.15rem 0 0;
+}
+
+.pwa-install-prompt {
+  align-items: center;
+  background: rgb(var(--color-surface-container-lowest));
+  border: 1px solid rgb(var(--color-surface-variant));
+  border-radius: 0.8rem;
+  box-shadow: var(--ambient-shadow);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem;
+}
+
+.pwa-install-prompt.is-settings {
+  background: rgb(var(--color-surface-container-low));
+  box-shadow: none;
+}
+
+.pwa-install-instructions {
+  font-weight: 600;
+}
+
+.pwa-install-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pwa-install-actions .is-secondary {
+  background: rgb(var(--color-surface-container-lowest));
+  color: rgb(var(--color-on-surface));
+}
+
+.error-boundary {
+  align-items: center;
+  background: rgb(var(--color-background));
+  color: rgb(var(--color-on-surface));
+  display: flex;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+.error-boundary > div {
+  background: rgb(var(--color-surface-container-lowest));
+  border: 1px solid rgb(var(--color-surface-variant));
+  border-radius: 1rem;
+  box-shadow: var(--ambient-shadow);
+  margin: auto;
+  max-width: 32rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.error-boundary h1 {
+  margin: 0.75rem 0 0;
+}
+
+.error-boundary p {
+  color: rgb(var(--color-on-surface-variant));
+  line-height: 1.6;
+}
+
+@media (max-width: 40rem) {
+  .pwa-banner {
+    grid-template-columns: auto 1fr;
+  }
+
+  .pwa-banner button {
+    grid-column: 1 / -1;
+  }
+
+  .pwa-install-prompt {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 button,
@@ -377,7 +616,11 @@ button:disabled {
   direction: ltr;
   -webkit-font-feature-settings: "liga";
   -webkit-font-smoothing: antialiased;
-  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
 }
 
 .material-symbols-outlined.grid {

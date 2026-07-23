@@ -1,0 +1,10 @@
+# Repository-wide ownership. GitHub branch rules must require Code Owner review
+# before this file has enforcement effect.
+* @ostenmatrixx
+
+# Security- and operations-sensitive areas stay explicitly owned even if more
+# granular component owners are added later.
+/.github/ @ostenmatrixx
+/docs/ @ostenmatrixx
+/supabase/ @ostenmatrixx
+/vercel.json @ostenmatrixx

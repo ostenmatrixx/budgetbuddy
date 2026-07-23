@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="BudgetBuddy privacy notice" />
+    <link rel="stylesheet" href="/legal.css" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Privacy Notice · BudgetBuddy</title>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/">BudgetBuddy</a>
+      <a href="/terms.html">Terms</a>
+    </header>
+    <main>
+      <h1>Privacy Notice</h1>
+      <p class="effective-date">Effective July 23, 2026</p>
+      <p>
+        BudgetBuddy is a personal-finance application. This notice explains the reference
+        deployment’s data practices. A person or organization operating its own deployment is
+        responsible for publishing contact and jurisdiction-specific terms before accepting users.
+      </p>
+
+      <h2>Data we process</h2>
+      <ul>
+        <li>Account email address and authentication metadata.</li>
+        <li>
+          Transactions, notes, categories, budget preferences, and regional settings you enter.
+        </li>
+        <li>Privacy-minimized application error diagnostics when monitoring is enabled.</li>
+        <li>Security and delivery metadata processed by infrastructure providers.</li>
+      </ul>
+
+      <h2>How data is used</h2>
+      <p>
+        Data is used only to authenticate accounts, operate budgeting features, generate requested
+        exports, protect the service, diagnose errors, and satisfy deletion requests. BudgetBuddy
+        does not include advertising and does not sell personal or financial data.
+      </p>
+
+      <h2>Service providers</h2>
+      <p>
+        The reference architecture uses Supabase for authentication and databases, Vercel for web
+        hosting, Cloudflare Turnstile for abuse prevention, an operator-configured email provider,
+        and optional privacy-minimized Sentry error reporting. Each provider processes the minimum
+        data needed for its role under its own terms.
+      </p>
+
+      <h2>Retention and backups</h2>
+      <p>
+        Active account data is retained until you delete it or the deployment operator removes it.
+        Account deletion removes the live authentication user and cascades to owned application
+        rows. Encrypted backups may retain deleted data until their scheduled expiration; backup
+        copies are not used for ordinary product access.
+      </p>
+
+      <h2>Your controls</h2>
+      <p>
+        Account Settings provides fresh JSON and CSV exports, password management, regional
+        preferences, and permanent account deletion. Contact the deployment operator if you cannot
+        access those controls.
+      </p>
+
+      <h2>Security and children</h2>
+      <p>
+        BudgetBuddy uses encrypted transport, row-level database authorization, abuse protection,
+        and restricted monitoring. No internet service can promise absolute security. The reference
+        deployment is not intended for children under 18.
+      </p>
+
+      <h2>Questions or security concerns</h2>
+      <p>
+        For the reference repository, use a private
+        <a href="https://github.com/ostenmatrixx/budget-tracker/security"
+          >GitHub security advisory</a
+        >. Operators must replace this with their own monitored privacy contact before launch.
+      </p>
+    </main>
+    <footer>
+      Review this notice whenever the deployment’s providers or data practices change.
+    </footer>
+  </body>
+</html>

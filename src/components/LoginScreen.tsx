@@ -1,7 +1,11 @@
-import { type CSSProperties, type FormEvent, useState } from "react";
+import { type FormEvent, useCallback, useState } from "react";
+import { usePwaStatus } from "../hooks/usePwaStatus";
 import { validateAuthInput, type AuthInputErrors, type AuthMode } from "../lib/auth";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import ThemeToggle, { type ThemeMode } from "./ThemeToggle";
+import Turnstile from "./Turnstile";
+
+type AuthScreenMode = AuthMode | "forgot" | "confirmation";
 
 interface LoginScreenProps {
   configurationError?: string;
@@ -9,12 +13,15 @@ interface LoginScreenProps {
   onToggleTheme: () => void;
 }
 
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim();
+
 export default function LoginScreen({
   configurationError,
   onToggleTheme,
   theme
 }: LoginScreenProps) {
-  const [mode, setMode] = useState<AuthMode>("signin");
+  const { isOffline } = usePwaStatus();
+  const [mode, setMode] = useState<AuthScreenMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<AuthInputErrors>({});
@@ -22,16 +29,56 @@ export default function LoginScreen({
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
+
+  const updateCaptchaToken = useCallback((token: string | null) => {
+    setCaptchaToken(token);
+  }, []);
+
+  const redirectTo = `${window.location.origin}${window.location.pathname}`;
+  const needsPassword = mode === "signin" || mode === "signup";
+  const captchaAction =
+    mode === "signup"
+      ? "signup"
+      : mode === "forgot"
+        ? "password_reset"
+        : mode === "confirmation"
+          ? "resend_confirmation"
+          : "signin";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setStatusMessage("");
 
-    const result = validateAuthInput(mode, email, password);
+    if (isOffline) {
+      setError("Reconnect before continuing.");
+      return;
+    }
 
-    if (!result.isValid || !result.value) {
-      setErrors(result.errors);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setErrors({ email: "Enter a valid email address." });
+      return;
+    }
+
+    let credentials: { email: string; password: string } | undefined;
+
+    if (needsPassword) {
+      const result = validateAuthInput(mode, email, password);
+
+      if (!result.isValid || !result.value) {
+        setErrors(result.errors);
+        return;
+      }
+
+      credentials = result.value;
+    }
+
+    if (turnstileSiteKey && !captchaToken) {
+      setError("Complete the security check before continuing.");
       return;
     }
 
@@ -40,22 +87,57 @@ export default function LoginScreen({
 
     try {
       const supabase = getSupabaseClient();
+      const captchaOptions = captchaToken ? { captchaToken } : {};
 
-      if (mode === "signin") {
-        const { error: signInError } = await supabase.auth.signInWithPassword(result.value);
+      if (mode === "signin" && credentials) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          ...credentials,
+          options: captchaOptions
+        });
 
         if (signInError) {
           setError(signInError.message);
         }
-      } else {
-        const { data, error: signUpError } = await supabase.auth.signUp(result.value);
+      } else if (mode === "signup" && credentials) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          ...credentials,
+          options: { ...captchaOptions, emailRedirectTo: redirectTo }
+        });
 
         if (signUpError) {
           setError(signUpError.message);
         } else if (!data.session) {
-          setStatusMessage("Account created. Check your email to confirm before signing in.");
+          setEmail(credentials.email);
+          setPassword("");
+          setMode("confirmation");
+          setStatusMessage("Account created. Check your email to confirm your account.");
         } else {
           setStatusMessage("Account created. Loading your dashboard...");
+        }
+      } else if (mode === "forgot") {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+          ...captchaOptions,
+          redirectTo
+        });
+
+        if (resetError) {
+          setError(resetError.message);
+        } else {
+          setStatusMessage(
+            "If an account exists for that email, a password recovery link is on its way."
+          );
+        }
+      } else if (mode === "confirmation") {
+        const { error: resendError } = await supabase.auth.resend({
+          type: "signup",
+          email: normalizedEmail,
+          options: { ...captchaOptions, emailRedirectTo: redirectTo }
+        });
+
+        if (resendError) {
+          setError(resendError.message);
+        } else {
+          setStatusMessage("A new confirmation email has been sent.");
         }
       }
     } catch (submitError) {
@@ -64,292 +146,251 @@ export default function LoginScreen({
       );
     } finally {
       setIsSubmitting(false);
+      setCaptchaToken(null);
+      setCaptchaAttempt((attempt) => attempt + 1);
     }
   }
 
-  function updateMode(nextMode: AuthMode) {
+  function updateMode(nextMode: AuthScreenMode) {
     setMode(nextMode);
+    setPassword("");
     setErrors({});
     setError("");
     setStatusMessage("");
+    setCaptchaToken(null);
+    setCaptchaAttempt((attempt) => attempt + 1);
   }
 
+  const heading =
+    mode === "signin"
+      ? "Welcome Back"
+      : mode === "signup"
+        ? "Create Account"
+        : mode === "forgot"
+          ? "Reset Password"
+          : "Confirm Your Email";
+  const description =
+    mode === "forgot"
+      ? "We’ll send a secure recovery link to your email."
+      : mode === "confirmation"
+        ? "Open the confirmation link we sent, or request another one."
+        : mode === "signin"
+          ? "Access your dashboard and stay on track."
+          : "Start tracking your budget with BudgetBuddy.";
+
   return (
-    <main className="animate-screen-in flex min-h-screen flex-col overflow-hidden bg-background text-on-background">
-      <header className="animate-slide-up flex h-14 w-full items-center justify-between border-b border-surface-variant bg-surface px-margin-mobile md:px-margin-desktop">
-        <div className="flex items-center gap-2">
-          <span
-            className="material-symbols-outlined animate-pop text-primary text-headline-md"
-            aria-hidden="true"
-          >
+    <main className="flex min-h-screen flex-col bg-background text-on-background">
+      <header className="flex h-14 items-center justify-between border-b border-surface-variant bg-surface px-margin-mobile md:px-margin-desktop">
+        <div className="flex items-center gap-2 font-bold text-primary">
+          <span className="material-symbols-outlined" aria-hidden="true">
             account_balance_wallet
           </span>
-          <span className="font-headline-md text-headline-md font-bold tracking-normal text-primary">
-            BudgetBuddy
-          </span>
+          <span className="text-headline-md">BudgetBuddy</span>
         </div>
-        <nav className="flex items-center gap-md" aria-label="Account actions">
-          <ThemeToggle compact theme={theme} onToggle={onToggleTheme} />
-          <span className="text-label-md font-label-md text-on-surface-variant">
-            Help
-          </span>
-          <button
-            className="text-label-md font-label-md text-on-surface-variant transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-            type="button"
-            onClick={() => updateMode(mode === "signin" ? "signup" : "signin")}
-          >
-            {mode === "signin" ? "Sign Up" : "Sign In"}
-          </button>
-        </nav>
+        <ThemeToggle compact theme={theme} onToggle={onToggleTheme} />
       </header>
 
-      <section className="relative flex flex-1 items-center justify-center px-gutter py-xl">
-        <div className="absolute left-1/2 top-1/2 -z-10 h-[680px] w-[680px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
-
-        <aside className="animate-card-in stagger-2 absolute left-margin-desktop hidden max-w-[280px] -translate-y-1/2 lg:top-1/2 lg:block">
-          <div
-            className="animate-float-soft rounded-xl border border-surface-variant bg-surface-container-low/60 p-lg shadow-sm backdrop-blur"
-            style={{ "--float-rotate": "-2deg" } as CSSProperties}
-          >
-            <span className="material-symbols-outlined mb-sm text-display text-secondary" aria-hidden="true">
-              trending_up
-            </span>
-            <h2 className="mb-xs text-headline-md font-headline-md text-on-surface">Track Growth</h2>
-            <p className="text-label-md font-label-md text-on-surface-variant">
-              Monitor spending, savings, and goals with clear monthly snapshots.
-            </p>
+      <section className="flex flex-1 items-center justify-center px-gutter py-xl">
+        <form className="app-surface w-full max-w-[480px] p-xl" onSubmit={handleSubmit} noValidate>
+          <div className="mb-xl text-center">
+            <h1 className="text-headline-lg font-headline-lg text-on-surface">{heading}</h1>
+            <p className="mt-2 text-body-md text-on-surface-variant">{description}</p>
           </div>
-          <div
-            className="animate-float-soft ml-12 mt-md rounded-xl border border-surface-variant bg-surface-container-lowest p-lg shadow-lg"
-            style={{ "--float-rotate": "3deg", animationDelay: "850ms" } as CSSProperties}
-          >
-            <div className="mb-sm flex items-center gap-sm">
-              <div className="grid h-8 w-8 place-items-center rounded-full bg-primary-fixed">
-                <span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">
-                  verified_user
-                </span>
-              </div>
-              <span className="text-label-md font-bold text-on-surface">Secure Access</span>
+
+          {(mode === "signin" || mode === "signup") && (
+            <div className="mb-lg grid grid-cols-2 rounded-lg border border-surface-variant bg-surface-container-low p-1">
+              {(["signin", "signup"] as const).map((option) => (
+                <button
+                  key={option}
+                  className={`rounded-md px-3 py-2 text-label-md transition ${
+                    mode === option
+                      ? "bg-surface-container-lowest text-primary shadow-sm"
+                      : "text-on-surface-variant"
+                  }`}
+                  type="button"
+                  onClick={() => updateMode(option)}
+                >
+                  {option === "signin" ? "Sign In" : "Sign Up"}
+                </button>
+              ))}
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-surface-variant">
-              <div className="animate-bar-fill h-full w-3/4 rounded-full bg-primary" />
-            </div>
-          </div>
-        </aside>
-
-        <form className="app-surface animate-card-in stagger-1 z-10 w-full max-w-[480px] p-xl" onSubmit={handleSubmit}>
-          <div className="animate-slide-up mb-xl text-center">
-            <h1 className="text-headline-lg font-headline-lg text-on-surface">
-              {mode === "signin" ? "Welcome Back" : "Create Account"}
-            </h1>
-            <p className="mt-2 text-body-md font-body-md text-on-surface-variant">
-              {mode === "signin"
-                ? "Access your dashboard and stay on track."
-                : "Start tracking your budget with BudgetBuddy."}
-            </p>
-          </div>
-
-          <div className="animate-slide-up stagger-1 mb-lg grid grid-cols-2 rounded-lg border border-surface-variant bg-surface-container-low p-1">
-            <button
-              className={`motion-button rounded-md px-3 py-2 text-label-md font-label-md transition ${
-                mode === "signin"
-                  ? "animate-pop bg-surface-container-lowest text-primary shadow-sm"
-                  : "text-on-surface-variant hover:text-primary"
-              }`}
-              type="button"
-              onClick={() => updateMode("signin")}
-            >
-              Sign In
-            </button>
-            <button
-              className={`motion-button rounded-md px-3 py-2 text-label-md font-label-md transition ${
-                mode === "signup"
-                  ? "animate-pop bg-surface-container-lowest text-primary shadow-sm"
-                  : "text-on-surface-variant hover:text-primary"
-              }`}
-              type="button"
-              onClick={() => updateMode("signup")}
-            >
-              Sign Up
-            </button>
-          </div>
+          )}
 
           <div className="flex flex-col gap-lg">
-            <div className="animate-slide-up stagger-2">
+            <div>
               <label
-                className="mb-xs block text-label-sm font-label-sm uppercase text-on-surface-variant"
+                className="mb-xs block text-label-sm uppercase text-on-surface-variant"
                 htmlFor="auth-email"
               >
                 Email Address
               </label>
-              <div className="input-well flex items-center gap-sm rounded-lg px-md py-3">
-                <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">
-                  mail
-                </span>
-                <input
-                  id="auth-email"
-                  className="field-control w-full border-none bg-transparent p-0 text-body-md font-body-md focus:border-none focus:bg-transparent focus:ring-0"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setErrors((current) => ({ ...current, email: undefined }));
-                  }}
-                  autoComplete="email"
-                />
-              </div>
-              {errors.email ? <p className="mt-1 text-xs font-semibold text-error">{errors.email}</p> : null}
+              <input
+                id="auth-email"
+                className="field-control input-well w-full rounded-lg px-md py-3"
+                type="email"
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setErrors((current) => ({ ...current, email: undefined }));
+                }}
+                autoComplete="email"
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? "auth-email-error" : undefined}
+              />
+              {errors.email && (
+                <p id="auth-email-error" className="mt-1 text-xs font-semibold text-error">
+                  {errors.email}
+                </p>
+              )}
             </div>
 
-            <div className="animate-slide-up stagger-3">
-              <div className="mb-xs flex items-end justify-between gap-md">
-                <label
-                  className="block text-label-sm font-label-sm uppercase text-on-surface-variant"
-                  htmlFor="auth-password"
-                >
-                  Password
-                </label>
-                {mode === "signin" ? (
-                  <span className="text-label-sm font-label-sm text-primary">
-                    Forgot password?
-                  </span>
-                ) : null}
+            {needsPassword && (
+              <div>
+                <div className="mb-xs flex items-center justify-between gap-md">
+                  <label
+                    className="text-label-sm uppercase text-on-surface-variant"
+                    htmlFor="auth-password"
+                  >
+                    Password
+                  </label>
+                  {mode === "signin" && (
+                    <button
+                      className="text-label-sm text-primary hover:underline"
+                      type="button"
+                      onClick={() => updateMode("forgot")}
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <div className="input-well flex items-center rounded-lg px-md py-3">
+                  <input
+                    id="auth-password"
+                    className="field-control w-full border-none bg-transparent p-0"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      setErrors((current) => ({ ...current, password: undefined }));
+                    }}
+                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                    aria-invalid={Boolean(errors.password)}
+                    aria-describedby={errors.password ? "auth-password-error" : undefined}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      {showPassword ? "visibility_off" : "visibility"}
+                    </span>
+                  </button>
+                </div>
+                {errors.password && (
+                  <p id="auth-password-error" className="mt-1 text-xs font-semibold text-error">
+                    {errors.password}
+                  </p>
+                )}
               </div>
-              <div className="input-well flex items-center gap-sm rounded-lg px-md py-3">
-                <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">
-                  lock
-                </span>
-                <input
-                  id="auth-password"
-                  className="field-control w-full border-none bg-transparent p-0 text-body-md font-body-md focus:border-none focus:bg-transparent focus:ring-0"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={password}
-                  onChange={(event) => {
-                    setPassword(event.target.value);
-                    setErrors((current) => ({ ...current, password: undefined }));
-                  }}
-                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                />
-                <button
-                  className="text-on-surface-variant transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-                  type="button"
-                  onClick={() => setShowPassword((current) => !current)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
-                    {showPassword ? "visibility_off" : "visibility"}
-                  </span>
-                </button>
-              </div>
-              {errors.password ? <p className="mt-1 text-xs font-semibold text-error">{errors.password}</p> : null}
-            </div>
+            )}
 
-            {configurationError ? (
-              <p className="rounded-lg bg-error-container px-3 py-2 text-sm font-medium text-error">
+            <Turnstile
+              key={`${captchaAction}-${captchaAttempt}`}
+              action={captchaAction}
+              onTokenChange={updateCaptchaToken}
+              siteKey={turnstileSiteKey}
+            />
+
+            {configurationError && (
+              <p
+                role="alert"
+                className="rounded-lg bg-error-container px-3 py-2 text-sm text-error"
+              >
                 {configurationError}
               </p>
-            ) : null}
-
-            {error ? (
-              <p className="rounded-lg bg-error-container px-3 py-2 text-sm font-medium text-error">{error}</p>
-            ) : null}
-
-            {statusMessage ? (
-              <p className="rounded-lg border border-surface-variant bg-surface-container-low px-3 py-2 text-sm font-medium text-on-surface-variant">
+            )}
+            {error && (
+              <p
+                role="alert"
+                className="rounded-lg bg-error-container px-3 py-2 text-sm text-error"
+              >
+                {error}
+              </p>
+            )}
+            {statusMessage && (
+              <p
+                role="status"
+                className="rounded-lg bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant"
+              >
                 {statusMessage}
               </p>
-            ) : null}
+            )}
 
             <button
-              className="motion-button group flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-label-md font-label-md text-on-primary shadow-sm transition hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-primary/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className="motion-button h-12 rounded-lg bg-primary px-4 font-bold text-on-primary disabled:opacity-60"
               type="submit"
-              disabled={isSubmitting || Boolean(configurationError)}
+              disabled={
+                isOffline ||
+                isSubmitting ||
+                Boolean(configurationError) ||
+                Boolean(turnstileSiteKey && !captchaToken)
+              }
+              title={isOffline ? "Reconnect to continue" : undefined}
             >
-              {isSubmitting ? (
-                <>
-                  <span
-                    className="material-symbols-outlined animate-spin-soft text-[18px]"
-                    aria-hidden="true"
-                  >
-                    progress_activity
-                  </span>
-                  Please wait...
-                </>
-              ) : mode === "signin" ? (
-                "Sign In"
-              ) : (
-                "Create Account"
-              )}
-              <span
-                className={`material-symbols-outlined text-[18px] transition group-hover:translate-x-1 ${
-                  isSubmitting ? "hidden" : ""
-                }`}
-                aria-hidden="true"
-              >
-                arrow_forward
-              </span>
+              {isSubmitting
+                ? "Please wait..."
+                : mode === "signin"
+                  ? "Sign In"
+                  : mode === "signup"
+                    ? "Create Account"
+                    : mode === "forgot"
+                      ? "Send Recovery Link"
+                      : "Resend Confirmation"}
             </button>
-          </div>
 
-          <div className="animate-fade-in stagger-4 mt-xl text-center">
-            <p className="text-body-md font-body-md text-on-surface-variant">
-              {mode === "signin" ? "Don't have an account?" : "Already have an account?"}{" "}
+            {(mode === "forgot" || mode === "confirmation") && (
               <button
-                className="font-bold text-primary transition hover:underline focus:outline-none focus:ring-2 focus:ring-primary/10"
+                className="font-bold text-primary hover:underline"
                 type="button"
-                onClick={() => updateMode(mode === "signin" ? "signup" : "signin")}
+                onClick={() => updateMode("signin")}
               >
-                {mode === "signin" ? "Create an account" : "Sign in"}
+                Back to sign in
               </button>
-            </p>
+            )}
+
+            {mode === "signup" ? (
+              <p className="text-center text-xs leading-5 text-on-surface-variant">
+                By creating an account, you agree to the{" "}
+                <a className="font-semibold text-primary hover:underline" href="/terms.html">
+                  Terms
+                </a>{" "}
+                and acknowledge the{" "}
+                <a className="font-semibold text-primary hover:underline" href="/privacy.html">
+                  Privacy Notice
+                </a>
+                .
+              </p>
+            ) : null}
           </div>
         </form>
-
-        <aside className="animate-card-in stagger-3 absolute right-margin-desktop hidden max-w-[320px] -translate-y-1/2 lg:top-1/2 lg:block">
-          <div className="relative aspect-square overflow-hidden rounded-xl border border-surface-variant bg-black-bean shadow-xl">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.24),transparent_42%)]" />
-            <div className="absolute inset-x-9 top-24 rounded-lg border border-surface-variant/20 bg-black-bean/80 p-md shadow-2xl">
-              <div className="mb-sm flex items-center gap-xs">
-                <span className="h-2 w-2 rounded-full bg-primary" />
-                <span className="h-2 w-2 rounded-full bg-secondary-container" />
-                <span className="h-2 w-2 rounded-full bg-surface-container-highest" />
-              </div>
-              <div className="flex h-28 items-end gap-xs">
-                {[38, 56, 44, 72, 52, 88, 68, 96, 74, 102, 84, 110].map((height, index) => (
-                  <span
-                    className="animate-bar-fill w-full rounded-t bg-primary/70"
-                    style={{ height: `${height}%`, animationDelay: `${index * 35}ms` }}
-                    key={height}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-lg">
-              <p className="text-label-md font-label-md italic text-white">
-                "Financial discipline is the bridge between goals and accomplishment."
-              </p>
-            </div>
-          </div>
-        </aside>
       </section>
 
-      <footer className="animate-fade-in stagger-5 px-margin-mobile pb-lg text-center md:px-margin-desktop">
-        <p className="text-label-sm font-label-sm text-outline">
-          (c) 2026 BudgetBuddy Inc. All rights reserved. Securely encrypted.
-        </p>
-        <div className="mt-sm flex justify-center gap-lg">
-          <span className="text-label-sm font-label-sm text-outline">
-            Privacy Policy
-          </span>
-          <span className="text-label-sm font-label-sm text-outline">
-            Terms of Service
-          </span>
-          <span className="text-label-sm font-label-sm text-outline">
-            Contact Support
-          </span>
-        </div>
+      <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-surface-variant px-4 py-4 text-xs text-on-surface-variant">
+        <span>BudgetBuddy production beta</span>
+        <a className="font-semibold hover:text-primary hover:underline" href="/privacy.html">
+          Privacy
+        </a>
+        <a className="font-semibold hover:text-primary hover:underline" href="/terms.html">
+          Terms
+        </a>
+        <a
+          className="font-semibold hover:text-primary hover:underline"
+          href="https://github.com/ostenmatrixx/budget-tracker/security"
+          rel="noreferrer"
+        >
+          Security
+        </a>
       </footer>
     </main>
   );

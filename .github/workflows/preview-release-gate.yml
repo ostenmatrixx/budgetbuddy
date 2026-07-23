@@ -1,0 +1,31 @@
+name: Preview release gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: Exact Vercel Preview URL backed by staging Supabase
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  headers-and-csp:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run check
+      - name: Verify deployed app shell, PWA, legal pages, and security headers
+        env:
+          PREVIEW_URL: ${{ inputs.preview_url }}
+        run: node scripts/verify-response-headers.mjs "$PREVIEW_URL"

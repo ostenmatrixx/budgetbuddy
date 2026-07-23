@@ -6,8 +6,10 @@ import {
   type BudgetPreference,
   type BudgetPreferenceKey
 } from "../lib/budget";
+import AccessibleDialog from "./AccessibleDialog";
 
 interface BudgetPreferenceEditorProps {
+  isWriteDisabled?: boolean;
   isSaving: boolean;
   preference: BudgetPreference;
   onClose: () => void;
@@ -24,6 +26,7 @@ const fields: Array<{
 ];
 
 export default function BudgetPreferenceEditor({
+  isWriteDisabled = false,
   isSaving,
   onClose,
   preference,
@@ -61,6 +64,11 @@ export default function BudgetPreferenceEditor({
   }
 
   async function handleSave() {
+    if (isWriteDisabled) {
+      setStatusMessage("Reconnect to save budget targets.");
+      return;
+    }
+
     if (!validation.isValid || !validation.value) {
       return;
     }
@@ -68,26 +76,23 @@ export default function BudgetPreferenceEditor({
     try {
       await onSave(validation.value);
       setStatusMessage("Targets saved.");
-    } catch {
-      setStatusMessage("");
+    } catch (saveError) {
+      setStatusMessage(
+        saveError instanceof Error ? saveError.message : "Unable to save budget targets."
+      );
     }
   }
 
   return (
-    <div
-      className="motion-backdrop fixed inset-0 z-50 flex items-end bg-on-surface/40 px-3 py-4 sm:items-center sm:justify-center"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+    <AccessibleDialog
+      className="animate-modal-in w-full rounded-xl border border-surface-variant bg-surface-container-lowest p-5 ambient-shadow sm:max-w-2xl"
+      descriptionId="budget-targets-description"
+      isCloseBlocked={isSaving}
+      labelId="budget-targets-title"
+      open
+      onRequestClose={onClose}
     >
-      <section
-        aria-labelledby="budget-targets-title"
-        aria-modal="true"
-        className="animate-modal-in w-full rounded-xl border border-surface-variant bg-surface-container-lowest p-5 ambient-shadow sm:max-w-2xl"
-        role="dialog"
-      >
+      <section aria-busy={isSaving}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="font-label-sm text-label-sm uppercase text-primary">
@@ -96,7 +101,10 @@ export default function BudgetPreferenceEditor({
             <h2 className="mt-1 text-xl font-semibold text-on-surface" id="budget-targets-title">
               Budget Targets
             </h2>
-            <p className="mt-1 text-sm leading-6 text-on-surface-variant">
+            <p
+              className="mt-1 text-sm leading-6 text-on-surface-variant"
+              id="budget-targets-description"
+            >
               Set the monthly allocation split used by the target cards. The total must be exactly
               100%.
             </p>
@@ -106,6 +114,7 @@ export default function BudgetPreferenceEditor({
             className="icon-control motion-icon-button shrink-0"
             title="Close"
             type="button"
+            disabled={isSaving}
             onClick={onClose}
           >
             <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
@@ -115,8 +124,11 @@ export default function BudgetPreferenceEditor({
         </div>
 
         <span
+          aria-live="polite"
           className={`mt-4 inline-flex w-fit rounded-full px-2.5 py-1 font-label-sm text-label-sm ${
-            total === 100 ? "bg-surface-container text-on-surface-variant" : "bg-error-container text-error"
+            total === 100
+              ? "bg-surface-container text-on-surface-variant"
+              : "bg-error-container text-error"
           }`}
         >
           Total {total}%
@@ -131,7 +143,10 @@ export default function BudgetPreferenceEditor({
               {field.label}
               <div className="mt-2 flex items-center rounded-lg border border-transparent bg-surface-container-lowest px-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10">
                 <input
+                  aria-describedby={validation.errors[field.key] ? `${field.key}-error` : undefined}
+                  aria-invalid={Boolean(validation.errors[field.key])}
                   className="min-w-0 flex-1 bg-transparent py-2 text-base font-bold text-on-surface outline-none"
+                  disabled={isSaving || isWriteDisabled}
                   type="number"
                   min="0"
                   max="100"
@@ -142,7 +157,7 @@ export default function BudgetPreferenceEditor({
                 <span className="text-sm font-bold text-outline">%</span>
               </div>
               {validation.errors[field.key] ? (
-                <span className="mt-1 block text-xs text-primary">
+                <span className="mt-1 block text-xs text-primary" id={`${field.key}-error`}>
                   {validation.errors[field.key]}
                 </span>
               ) : null}
@@ -151,13 +166,19 @@ export default function BudgetPreferenceEditor({
         </div>
 
         {validation.errors.total ? (
-          <p className="mt-3 rounded-lg bg-error-container px-3 py-2 text-sm font-semibold text-error">
+          <p
+            className="mt-3 rounded-lg bg-error-container px-3 py-2 text-sm font-semibold text-error"
+            role="alert"
+          >
             {validation.errors.total}
           </p>
         ) : null}
 
         {statusMessage ? (
-          <p className="mt-3 rounded-lg bg-surface-container-low px-3 py-2 text-sm font-semibold text-on-surface-variant">
+          <p
+            className="mt-3 rounded-lg bg-surface-container-low px-3 py-2 text-sm font-semibold text-on-surface-variant"
+            role="status"
+          >
             {statusMessage}
           </p>
         ) : null}
@@ -166,6 +187,7 @@ export default function BudgetPreferenceEditor({
           <button
             className="motion-button rounded-lg border border-surface-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition hover:border-outline hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-primary/10"
             type="button"
+            disabled={isSaving || isWriteDisabled}
             onClick={handleBalanceOthers}
           >
             Balance others
@@ -173,6 +195,7 @@ export default function BudgetPreferenceEditor({
           <button
             className="motion-button rounded-lg border border-surface-variant bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface transition hover:border-outline hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-primary/10"
             type="button"
+            disabled={isSaving}
             onClick={onClose}
           >
             Cancel
@@ -180,13 +203,13 @@ export default function BudgetPreferenceEditor({
           <button
             className="motion-button rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary ambient-shadow transition hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
-            disabled={!validation.isValid || !hasChanges || isSaving}
+            disabled={!validation.isValid || !hasChanges || isSaving || isWriteDisabled}
             onClick={handleSave}
           >
             {isSaving ? "Saving..." : "Save targets"}
           </button>
         </div>
       </section>
-    </div>
+    </AccessibleDialog>
   );
 }

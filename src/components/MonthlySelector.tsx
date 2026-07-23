@@ -29,7 +29,9 @@ export default function MonthlySelector({ month, year, onChange }: MonthlySelect
           </span>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">Period</p>
-            <h2 className="text-base font-bold text-on-surface">{months[month - 1]} {year}</h2>
+            <h2 className="text-base font-bold text-on-surface">
+              {months[month - 1]} {year}
+            </h2>
           </div>
         </div>
         <div className="grid gap-2 sm:grid-cols-[minmax(10rem,1fr)_7rem]">

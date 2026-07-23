@@ -1,0 +1,96 @@
+:root {
+  color: #1a1c1d;
+  background: #f9f9fb;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  line-height: 1.6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+header,
+main,
+footer {
+  margin: 0 auto;
+  max-width: 52rem;
+  padding: 1.25rem;
+}
+
+header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+main {
+  background: #fff;
+  border: 1px solid #e2e2e4;
+  border-radius: 0.9rem;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 6%);
+  margin-bottom: 2rem;
+}
+
+h1,
+h2 {
+  line-height: 1.2;
+}
+
+h1 {
+  color: #af101a;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin-top: 2rem;
+}
+
+a {
+  color: #af101a;
+}
+
+.brand {
+  font-size: 1.2rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.effective-date,
+footer {
+  color: #5b403d;
+  font-size: 0.9rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f5eff0;
+    background: #121417;
+  }
+
+  main {
+    background: #1b1d22;
+    border-color: #41373a;
+  }
+
+  h1,
+  a {
+    color: #ff8a80;
+  }
+
+  .effective-date,
+  footer {
+    color: #d7bebc;
+  }
+}

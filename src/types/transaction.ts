@@ -1,5 +1,9 @@
 export const transactionTypes = ["income", "bills", "non_essentials", "savings"] as const;
 
+export const TRANSACTION_DESCRIPTION_MAX_LENGTH = 200;
+export const TRANSACTION_NOTES_MAX_LENGTH = 2000;
+export const TRANSACTION_SUBCATEGORY_MAX_LENGTH = 60;
+
 export type TransactionType = (typeof transactionTypes)[number];
 
 export type TransactionSubcategory = string;
@@ -19,6 +23,8 @@ export type TransactionSubcategoriesByType = Partial<
 
 export interface Transaction {
   id: string;
+  clientRequestId?: string;
+  version: number;
   type: TransactionType;
   subcategory?: TransactionSubcategory;
   amount: number;

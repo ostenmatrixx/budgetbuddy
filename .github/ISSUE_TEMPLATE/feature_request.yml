@@ -1,0 +1,41 @@
+name: Feature request
+description: Propose a product or engineering improvement.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the user problem before proposing an implementation. Do not include real financial records or personal data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Who experiences the problem, and what outcome is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe the desired behavior without requiring a particular technical design.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or simpler approaches have you considered?
+  - type: textarea
+    id: production
+    attributes:
+      label: Production considerations
+      description: Note possible privacy, security, accessibility, migration, offline, or operating-cost effects.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues for a similar request.
+          required: true
+        - label: This request contains no personal or financial data.
+          required: true
