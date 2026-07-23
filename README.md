@@ -1,7 +1,8 @@
 # BudgetBuddy
 
-[![CI](https://github.com/ostenmatrixx/budget-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/ostenmatrixx/budget-tracker/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/ostenmatrixx/budget-tracker/actions/workflows/codeql.yml/badge.svg)](https://github.com/ostenmatrixx/budget-tracker/actions/workflows/codeql.yml)
+[![CI](https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/ci.yml/badge.svg)](https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/codeql.yml/badge.svg)](https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 BudgetBuddy is a privacy-conscious personal finance PWA for tracking income, essentials, savings, and discretionary spending. It combines a responsive React dashboard with Supabase authentication and owner-scoped Postgres data, and is engineered for a public multi-user beta on Vercel.
 
@@ -30,6 +31,18 @@ BudgetBuddy is a privacy-conscious personal finance PWA for tracking income, ess
 - CodeQL, dependency review, Dependabot, encrypted-backup automation, staging validation, and read-only production health checks
 
 The codebase provides production-grade controls, but a real launch still requires the hosted configuration and staging evidence in the [production runbook](docs/production-runbook.md). Repository automation cannot prove that external Supabase, Vercel, SMTP, Turnstile, Sentry, DNS, or administrator settings are correct.
+
+## Tech stack
+
+| Area                       | Technologies                                                                 |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| Frontend                   | React 19, TypeScript 5.9, Tailwind CSS 3, Vite 7                             |
+| Authentication and data    | Supabase Auth, PostgreSQL, PostgREST, Row Level Security                     |
+| Server-side operations     | Supabase Edge Functions                                                      |
+| PWA                        | Web App Manifest, Service Worker API, install and offline lifecycle handling |
+| Security and observability | Cloudflare Turnstile, Sentry, Vercel CSP and security headers                |
+| Testing                    | Vitest, Testing Library, Playwright, axe-core, pgTAP, Lighthouse             |
+| Delivery and maintenance   | Vercel, GitHub Actions, CodeQL, Dependabot, Node.js 24                       |
 
 ## Architecture
 
@@ -96,7 +109,7 @@ Use separate Supabase projects and Vercel variables for Preview and Production. 
 
 ## Security, privacy, and operations
 
-- Report vulnerabilities through [GitHub private security advisories](https://github.com/ostenmatrixx/budget-tracker/security/advisories/new); see [SECURITY.md](SECURITY.md).
+- Report vulnerabilities through [GitHub private security advisories](https://github.com/ostenmatrixx/budgetbuddy/security/advisories/new); see [SECURITY.md](SECURITY.md).
 - Review the [incident response](docs/incident-response.md), [data retention](docs/data-retention.md), and [backup and restore](docs/backup-and-restore.md) procedures before launch.
 - Replace the included privacy and terms templates with owner-approved text that accurately reflects configured providers and applicable law.
 - Enable protected branches, required checks, private vulnerability reporting, secret scanning, push protection, and administrator MFA in hosted consoles.
@@ -105,4 +118,8 @@ Use separate Supabase projects and Vercel variables for Preview and Production. 
 
 Receipt scanning, recurring transactions, CSV import, bank synchronization, alerts, persistent offline financial storage, and background mutation queues are intentionally deferred until the production-beta foundation has been deployed and observed under real use.
 
-Contributions are welcome through the process in [CONTRIBUTING.md](CONTRIBUTING.md). This repository does not yet declare an open-source license; choose and add one before inviting third-party code reuse.
+Contributions are welcome through the process in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+BudgetBuddy is available under the [MIT License](LICENSE).
