@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(60);
+select plan(68);
 
 select has_table('public', 'transactions', 'transactions table exists');
 select has_table('public', 'budget_preferences', 'budget preferences table exists');
@@ -49,6 +49,38 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'public.get_account_balance()', 'execute'),
   'authenticated users can execute the account balance function'
+);
+select ok(
+  not has_function_privilege('anon', 'public.validate_user_settings_time_zone()', 'execute'),
+  'anon cannot execute the time zone validation trigger function'
+);
+select ok(
+  not has_function_privilege('authenticated', 'public.validate_user_settings_time_zone()', 'execute'),
+  'authenticated users cannot execute the time zone validation trigger function'
+);
+select ok(
+  not has_function_privilege('anon', 'public.set_user_settings_updated_at()', 'execute'),
+  'anon cannot execute the settings timestamp trigger function'
+);
+select ok(
+  not has_function_privilege('authenticated', 'public.set_user_settings_updated_at()', 'execute'),
+  'authenticated users cannot execute the settings timestamp trigger function'
+);
+select ok(
+  not has_function_privilege('anon', 'public.create_default_user_settings()', 'execute'),
+  'anon cannot execute the default settings trigger function'
+);
+select ok(
+  not has_function_privilege('authenticated', 'public.create_default_user_settings()', 'execute'),
+  'authenticated users cannot execute the default settings trigger function'
+);
+select ok(
+  not has_function_privilege('anon', 'public.increment_transaction_version()', 'execute'),
+  'anon cannot execute the transaction version trigger function'
+);
+select ok(
+  not has_function_privilege('authenticated', 'public.increment_transaction_version()', 'execute'),
+  'authenticated users cannot execute the transaction version trigger function'
 );
 
 insert into auth.users (
