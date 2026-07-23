@@ -26,6 +26,7 @@ import {
 } from "../lib/storage";
 import {
   transactionTypes,
+  transactionTypeShortLabels,
   type Transaction,
   type TransactionDraft,
   type TransactionSubcategoriesByType,
@@ -103,6 +104,8 @@ export default function Dashboard({
   const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [hasCreatedTransaction, setHasCreatedTransaction] = useState(false);
+  const [activeMobileCategory, setActiveMobileCategory] = useState<TransactionType>("income");
+  const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
 
   useEffect(() => {
     const period = getCurrentPeriod(settings.timeZone);
@@ -447,16 +450,18 @@ export default function Dashboard({
       </aside>
 
       <div className="flex min-h-screen flex-col md:pl-64">
-        <header className="animate-slide-up sticky top-0 z-30 flex min-h-14 items-center justify-between gap-3 border-b border-surface-variant bg-surface px-4 py-3 md:fixed md:left-64 md:right-0 md:h-14 md:px-6 md:py-0">
-          <div className="flex min-w-0 items-center gap-3">
+        <header className="animate-slide-up sticky top-0 z-30 flex min-h-14 items-center justify-between gap-2 border-b border-surface-variant bg-surface px-4 py-3 md:fixed md:left-64 md:right-0 md:h-14 md:gap-3 md:px-6 md:py-0">
+          <div className="flex min-w-0 items-center gap-2 md:gap-3">
             <BrandIcon className="h-6 w-6 shrink-0 md:hidden" />
             <div className="min-w-0">
-              <h1 className="truncate text-xl font-bold text-primary md:text-2xl">{activeTitle}</h1>
+              <h1 className="truncate text-lg font-bold text-primary sm:text-xl md:text-2xl">
+                {activeTitle}
+              </h1>
               <p className="truncate text-xs font-semibold text-outline">{activePeriod}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 md:gap-3">
             <div className="hidden items-end gap-6 lg:flex">
               <div className="text-right">
                 <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
@@ -475,17 +480,6 @@ export default function Dashboard({
             </div>
 
             <button
-              className="motion-icon-button relative grid h-10 w-10 place-items-center rounded-full text-on-surface-variant opacity-60"
-              type="button"
-              aria-label="Notifications"
-              title="Notifications"
-              disabled
-            >
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="animate-pulse-soft absolute right-2.5 top-2.5 h-2 w-2 rounded-full border-2 border-surface bg-primary" />
-            </button>
-
-            <button
               aria-label="New transaction"
               className="motion-button motion-icon-button flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-on-primary ambient-shadow transition active:scale-95 hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-primary/20"
               disabled={isOffline}
@@ -497,28 +491,20 @@ export default function Dashboard({
               <span className="hidden sm:inline">New Transaction</span>
             </button>
 
-            <ThemeToggle compact className="md:hidden" theme={theme} onToggle={onToggleTheme} />
-
             <button
-              aria-label="Account settings"
-              className="motion-icon-button grid h-10 w-10 place-items-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/10 md:hidden"
-              title="Account settings"
+              aria-expanded={isMobileActionsOpen}
+              aria-haspopup="dialog"
+              aria-label="Account actions"
+              className="motion-icon-button grid h-10 w-10 place-items-center rounded-lg border border-surface-variant bg-surface-container-lowest text-on-surface-variant transition hover:border-outline hover:bg-surface-container-high hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 md:hidden"
+              title="Account actions"
               type="button"
-              onClick={() => setIsAccountSettingsOpen(true)}
+              onClick={() => setIsMobileActionsOpen(true)}
             >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                settings
+              <span className="flex items-center gap-1" aria-hidden="true">
+                <span className="h-1 w-1 rounded-full bg-current" />
+                <span className="h-1 w-1 rounded-full bg-current" />
+                <span className="h-1 w-1 rounded-full bg-current" />
               </span>
-            </button>
-
-            <button
-              className="motion-icon-button grid h-10 w-10 place-items-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/10 md:hidden"
-              type="button"
-              onClick={onLogout}
-              aria-label="Logout"
-              title="Logout"
-            >
-              <span className="material-symbols-outlined">logout</span>
             </button>
           </div>
         </header>
@@ -529,22 +515,37 @@ export default function Dashboard({
           tabIndex={-1}
         >
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-            <div className="rounded-xl border border-surface-variant bg-surface-container-lowest p-4 ambient-shadow lg:hidden">
-              <DashboardViewToggle view={view} onChange={handleViewChange} />
+            <div className="rounded-xl border border-surface-variant bg-surface-container-lowest p-2 ambient-shadow lg:hidden">
+              <DashboardViewToggle compact view={view} onChange={handleViewChange} />
             </div>
 
-            <section className="grid gap-3 sm:grid-cols-2 lg:hidden">
-              <article className="rounded-lg border border-surface-variant bg-surface-container-lowest p-4">
+            <section
+              className="grid grid-cols-2 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest ambient-shadow lg:hidden"
+              aria-label="Financial snapshot"
+            >
+              <article className="min-w-0 p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
                   Remaining income
                 </p>
-                <p className="mt-1 text-2xl font-bold">{formatCurrency(activeRemainingIncome)}</p>
+                <p
+                  className={`mt-1 truncate text-xl font-bold sm:text-2xl ${
+                    activeRemainingIncome < 0
+                      ? "text-error"
+                      : activeRemainingIncome > 0
+                        ? "text-success"
+                        : "text-on-surface"
+                  }`}
+                >
+                  {formatCurrency(activeRemainingIncome)}
+                </p>
               </article>
-              <article className="rounded-lg border border-surface-variant bg-surface-container-lowest p-4">
+              <article className="min-w-0 border-l border-surface-variant p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
                   Total balance
                 </p>
-                <p className="mt-1 text-2xl font-bold">{formatCurrency(totalBalance)}</p>
+                <p className="mt-1 truncate text-xl font-bold sm:text-2xl">
+                  {formatCurrency(totalBalance)}
+                </p>
               </article>
             </section>
 
@@ -573,7 +574,7 @@ export default function Dashboard({
                       year={selectedYear}
                       onChange={handleMonthChange}
                     />
-                    <SummaryCards summary={summary} />
+                    <SummaryCards hideRemainingBelowDesktop summary={summary} />
                     <BudgetAllocationCards
                       isWriteDisabled={isOffline}
                       preference={budgetPreference}
@@ -603,32 +604,65 @@ export default function Dashboard({
                   </div>
                 </section>
 
-                <section className="grid gap-5 lg:grid-cols-2">
-                  {transactionTypes.map((type, index) => (
-                    <TransactionSection
-                      isWriteDisabled={isOffline}
-                      key={type}
-                      type={type}
-                      year={selectedYear}
-                      month={selectedMonth}
-                      transactions={monthlyTransactions.filter(
-                        (transaction) => transaction.type === type
-                      )}
-                      pieSegments={calculateCategoryPieSegments(
-                        transactions,
-                        selectedYear,
-                        selectedMonth,
-                        type
-                      )}
-                      subcategoriesByType={subcategoriesByType}
-                      onAdd={() => setModalState(createTransactionModalState({ type }))}
-                      onAddSubcategory={handleAddSubcategory}
-                      onArchiveSubcategory={handleArchiveSubcategory}
-                      onDelete={handleDeleteTransaction}
-                      onEdit={(transaction) => setModalState({ transaction })}
-                      motionIndex={index}
-                    />
-                  ))}
+                <section className="grid gap-5">
+                  <nav
+                    aria-label="Transaction category"
+                    className="app-surface overflow-x-auto p-1 lg:hidden"
+                  >
+                    <div className="flex min-w-max items-center gap-1">
+                      {transactionTypes.map((type) => {
+                        const isActive = activeMobileCategory === type;
+
+                        return (
+                          <button
+                            aria-pressed={isActive}
+                            className={`motion-button rounded-lg px-3 py-2 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                              isActive
+                                ? "bg-primary text-on-primary shadow-sm"
+                                : "text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
+                            }`}
+                            key={type}
+                            type="button"
+                            onClick={() => setActiveMobileCategory(type)}
+                          >
+                            {transactionTypeShortLabels[type]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </nav>
+
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    {transactionTypes.map((type, index) => (
+                      <div
+                        className={activeMobileCategory === type ? "block" : "hidden lg:block"}
+                        key={type}
+                      >
+                        <TransactionSection
+                          isWriteDisabled={isOffline}
+                          type={type}
+                          year={selectedYear}
+                          month={selectedMonth}
+                          transactions={monthlyTransactions.filter(
+                            (transaction) => transaction.type === type
+                          )}
+                          pieSegments={calculateCategoryPieSegments(
+                            transactions,
+                            selectedYear,
+                            selectedMonth,
+                            type
+                          )}
+                          subcategoriesByType={subcategoriesByType}
+                          onAdd={() => setModalState(createTransactionModalState({ type }))}
+                          onAddSubcategory={handleAddSubcategory}
+                          onArchiveSubcategory={handleArchiveSubcategory}
+                          onDelete={handleDeleteTransaction}
+                          onEdit={(transaction) => setModalState({ transaction })}
+                          motionIndex={index}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </section>
               </div>
             ) : null}
@@ -698,6 +732,79 @@ export default function Dashboard({
         }}
         onConfirm={handleConfirmDeleteTransaction}
       />
+
+      <AccessibleDialog
+        className="animate-modal-in w-full rounded-xl border border-surface-variant bg-surface-container-lowest p-5 shadow-[0_24px_90px_rgba(50,24,24,0.24)] sm:max-w-sm md:hidden"
+        descriptionId="mobile-account-actions-description"
+        labelId="mobile-account-actions-title"
+        open={isMobileActionsOpen}
+        onRequestClose={() => setIsMobileActionsOpen(false)}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold" id="mobile-account-actions-title">
+              Account actions
+            </h2>
+            <p
+              className="mt-1 text-sm text-on-surface-variant"
+              id="mobile-account-actions-description"
+            >
+              Appearance, preferences, and sign out.
+            </p>
+          </div>
+          <button
+            aria-label="Close account actions"
+            className="icon-control motion-icon-button"
+            title="Close"
+            type="button"
+            onClick={() => setIsMobileActionsOpen(false)}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              close
+            </span>
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-2">
+          <button
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="motion-button flex min-h-12 items-center gap-3 rounded-lg border border-surface-variant bg-surface-container-lowest px-4 text-left text-sm font-semibold text-on-surface-variant transition hover:border-outline hover:bg-surface-container-high hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            type="button"
+            onClick={onToggleTheme}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              {theme === "dark" ? "light_mode" : "dark_mode"}
+            </span>
+            {theme === "dark" ? "Use light appearance" : "Use dark appearance"}
+          </button>
+          <button
+            className="motion-button flex min-h-12 items-center gap-3 rounded-lg border border-surface-variant bg-surface-container-lowest px-4 text-left text-sm font-semibold text-on-surface-variant transition hover:border-outline hover:bg-surface-container-high hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            type="button"
+            onClick={() => {
+              setIsMobileActionsOpen(false);
+              setIsAccountSettingsOpen(true);
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              manage_accounts
+            </span>
+            Account settings
+          </button>
+          <button
+            className="motion-button flex min-h-12 items-center gap-3 rounded-lg border border-error/30 bg-error-container/45 px-4 text-left text-sm font-semibold text-error transition hover:bg-error-container focus:outline-none focus:ring-2 focus:ring-error/20"
+            type="button"
+            onClick={() => {
+              setIsMobileActionsOpen(false);
+              void onLogout();
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              logout
+            </span>
+            Sign out
+          </button>
+        </div>
+      </AccessibleDialog>
 
       <AccessibleDialog
         className="animate-modal-in max-h-[calc(100svh-2rem)] w-full overflow-y-auto rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_24px_90px_rgba(50,24,24,0.24)] sm:max-w-2xl"

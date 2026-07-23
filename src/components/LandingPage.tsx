@@ -148,10 +148,11 @@ export default function LandingPage({ onToggleTheme, theme }: LandingPageProps) 
           />
         </div>
 
-        <div
-          className="landing-preview-wrap"
-          aria-label="Illustrative BudgetBuddy dashboard preview"
-        >
+        <p className="sr-only">
+          Illustrative monthly dashboard preview showing an available balance, budget allocation,
+          and recent activity.
+        </p>
+        <div className="landing-preview-wrap" aria-hidden="true">
           <div className="landing-preview-stamp" aria-hidden="true">
             <span>Sample</span>
             <strong>Monthly view</strong>
@@ -171,9 +172,7 @@ export default function LandingPage({ onToggleTheme, theme }: LandingPageProps) 
                   <span>Overview</span>
                   <strong>August</strong>
                 </div>
-                <button type="button" tabIndex={-1}>
-                  + New entry
-                </button>
+                <span className="landing-preview-action">+ New entry</span>
               </div>
 
               <div className="landing-balance-card">

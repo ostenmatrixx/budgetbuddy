@@ -2,10 +2,14 @@ import { useUserSettings } from "../contexts/UserSettingsContext";
 import { type BudgetSummary } from "../lib/budget";
 
 interface SummaryCardsProps {
+  hideRemainingBelowDesktop?: boolean;
   summary: BudgetSummary;
 }
 
-export default function SummaryCards({ summary }: SummaryCardsProps) {
+export default function SummaryCards({
+  hideRemainingBelowDesktop = false,
+  summary
+}: SummaryCardsProps) {
   const { formatCurrency } = useUserSettings();
   const items = [
     { label: "Income", value: summary.totalIncome, tone: "primary" },
@@ -17,27 +21,31 @@ export default function SummaryCards({ summary }: SummaryCardsProps) {
       label: "Remaining Income",
       value: summary.remainingIncome,
       alert: summary.remainingIncome < 0,
-      tone: "primary"
+      tone:
+        summary.remainingIncome < 0 ? "error" : summary.remainingIncome > 0 ? "success" : "neutral",
+      isRemaining: true
     }
   ];
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Dashboard summary">
+    <section className="summary-grid" aria-label="Dashboard summary">
       {items.map((item, index) => (
         <article
-          className={`animate-card-in stagger-${(index % 6) + 1} motion-card rounded-xl border bg-surface-container-lowest p-4 ambient-shadow transition-colors ${
-            item.alert
-              ? "border-outline-variant"
-              : item.tone === "primary"
-                ? "border-surface-variant"
-                : "border-surface-variant"
-          }`}
+          className={`summary-card animate-card-in stagger-${(index % 6) + 1} motion-card transition-colors ${
+            item.alert ? "is-alert" : ""
+          } ${item.isRemaining && hideRemainingBelowDesktop ? "is-desktop-only" : ""}`}
           key={item.label}
         >
           <p className="font-label-sm text-label-sm uppercase text-outline">{item.label}</p>
           <p
             className={`mt-2 text-2xl font-bold leading-8 ${
-              item.alert || item.tone === "primary" ? "text-primary" : "text-on-surface"
+              item.tone === "error"
+                ? "text-error"
+                : item.tone === "success"
+                  ? "text-success"
+                  : item.tone === "primary"
+                    ? "text-primary"
+                    : "text-on-surface"
             }`}
           >
             {formatCurrency(item.value)}

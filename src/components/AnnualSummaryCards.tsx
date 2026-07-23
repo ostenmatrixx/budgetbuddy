@@ -16,7 +16,8 @@ export default function AnnualSummaryCards({ report }: AnnualSummaryCardsProps) 
     {
       label: "Remaining Income",
       value: report.yearly.remainingIncome,
-      alert: report.yearly.remainingIncome < 0
+      alert: report.yearly.remainingIncome < 0,
+      positive: report.yearly.remainingIncome > 0
     }
   ];
 
@@ -50,7 +51,7 @@ export default function AnnualSummaryCards({ report }: AnnualSummaryCardsProps) 
           </div>
           <p
             className={`mt-3 text-headline-md font-headline-md ${
-              item.alert ? "text-error" : "text-on-surface"
+              item.alert ? "text-error" : item.positive ? "text-success" : "text-on-surface"
             }`}
           >
             {formatCurrency(item.value)}

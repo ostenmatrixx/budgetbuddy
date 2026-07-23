@@ -20,7 +20,9 @@ const categories: Array<{
 ];
 
 export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChartProps) {
-  const { formatCurrency } = useUserSettings();
+  const { formatCurrency, settings } = useUserSettings();
+  const currentPeriod = getCurrentPeriod(settings.timeZone);
+
   return (
     <section className="app-surface animate-card-in min-w-0 overflow-hidden p-4 md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -37,38 +39,65 @@ export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChar
       </div>
 
       <div className="mt-5 w-full overflow-x-auto pb-2">
+        <div
+          aria-label={`Chart scale from ${formatCurrency(0)} to ${formatCurrency(report.maxChartValue)}`}
+          className="mb-2 flex min-w-[680px] items-center justify-between rounded-lg bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant lg:min-w-0"
+        >
+          <span>Chart scale</span>
+          <span>
+            {formatCurrency(0)} · {formatCurrency(report.maxChartValue / 2)} ·{" "}
+            {formatCurrency(report.maxChartValue)}
+          </span>
+        </div>
         <div className="grid min-w-[680px] grid-cols-12 gap-2.5 lg:min-w-0">
-          {report.months.map((month, monthIndex) => (
-            <div
-              className={`animate-slide-up stagger-${(monthIndex % 6) + 1} flex flex-col gap-2`}
-              key={month.month}
-            >
-              <div className="flex h-56 items-end justify-center gap-1.5 rounded-lg bg-surface-container px-2 py-3 ring-1 ring-surface-variant">
-                {categories.map((category) => {
-                  const value = month[category.key];
-                  const height = barHeight(value, report.maxChartValue);
+          {report.months.map((month, monthIndex) => {
+            const isFuture = isFutureMonth(report.year, month.month, currentPeriod);
+            const hasActivity = categories.some((category) => month[category.key] > 0);
 
-                  return (
-                    <div
-                      aria-label={`${month.monthLabel} ${category.label}: ${formatCurrency(value)}`}
-                      className="flex h-full flex-1 items-end"
-                      key={category.key}
-                      role="img"
-                      title={`${category.label}: ${formatCurrency(value)}`}
-                    >
-                      <span
-                        className={`animate-bar-fill w-full rounded-t-sm transition-all duration-500 ${category.className}`}
-                        style={{ height, animationDelay: `${monthIndex * 35}ms` }}
-                      />
+            return (
+              <div
+                className={`animate-slide-up stagger-${(monthIndex % 6) + 1} flex flex-col gap-2`}
+                key={month.month}
+              >
+                <div
+                  className={`flex h-56 items-end justify-center gap-1.5 rounded-lg px-2 py-3 ring-1 ${
+                    isFuture
+                      ? "bg-surface-container-low text-outline ring-surface-variant"
+                      : "bg-surface-container ring-surface-variant"
+                  }`}
+                >
+                  {isFuture || !hasActivity ? (
+                    <div className="flex h-full w-full items-center justify-center text-center text-[11px] font-semibold text-outline">
+                      {isFuture ? "Upcoming" : "No activity"}
                     </div>
-                  );
-                })}
+                  ) : (
+                    categories.map((category) => {
+                      const value = month[category.key];
+                      const height = barHeight(value, report.maxChartValue);
+
+                      return (
+                        <div
+                          aria-label={`${month.monthLabel} ${category.label}: ${formatCurrency(value)}`}
+                          className="flex h-full flex-1 items-end"
+                          key={category.key}
+                          role="img"
+                          title={`${category.label}: ${formatCurrency(value)}`}
+                        >
+                          <span
+                            className={`animate-bar-fill w-full rounded-t-sm transition-all duration-500 ${category.className}`}
+                            style={{ height, animationDelay: `${monthIndex * 35}ms` }}
+                          />
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <p className="text-center text-label-sm font-label-sm text-outline">
+                  {month.monthLabel}
+                </p>
               </div>
-              <p className="text-center text-label-sm font-label-sm text-outline">
-                {month.monthLabel}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
@@ -94,4 +123,27 @@ function barHeight(value: number, max: number): string {
   }
 
   return `${Math.max(6, Math.round((value / max) * 100))}%`;
+}
+
+function getCurrentPeriod(timeZone: string): { month: number; year: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    month: "numeric",
+    timeZone,
+    year: "numeric"
+  }).formatToParts(new Date());
+  const month = Number(parts.find(({ type }) => type === "month")?.value);
+  const year = Number(parts.find(({ type }) => type === "year")?.value);
+
+  return { month, year };
+}
+
+function isFutureMonth(
+  reportYear: number,
+  reportMonth: number,
+  currentPeriod: { month: number; year: number }
+): boolean {
+  return (
+    reportYear > currentPeriod.year ||
+    (reportYear === currentPeriod.year && reportMonth > currentPeriod.month)
+  );
 }
