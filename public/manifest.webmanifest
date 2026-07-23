@@ -2,7 +2,7 @@
   "id": "/",
   "name": "BudgetBuddy",
   "short_name": "BudgetBuddy",
-  "description": "A personal budget tracker for income, essentials, savings, and non-essential spending.",
+  "description": "An install-first personal budget tracker for income, essentials, savings, and everyday spending.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

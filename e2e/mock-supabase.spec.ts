@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Download, type Page, type Route } from "@playwright/test";
+import { emulateInstalledPwa } from "./helpers/standalone";
 
 interface MockDatabase {
   capturedPassword: string;
@@ -164,6 +165,7 @@ function createMockDatabase(): MockDatabase {
 }
 
 async function signIn(page: Page) {
+  await emulateInstalledPwa(page);
   await page.goto("/");
   await page.getByLabel("Email Address").fill(mockUser.email);
   await page.getByLabel("Password", { exact: true }).fill("password-with-spaces  ");

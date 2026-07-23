@@ -8,6 +8,7 @@ coverage
 *.tsbuildinfo
 dev-server.*.log
 .playwright-mcp
+.playwright-cli
 playwright-report
 test-results
 lighthouse-results

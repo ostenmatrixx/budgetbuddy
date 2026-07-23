@@ -38,6 +38,7 @@ export default function LoginScreen({
   }, []);
 
   const redirectTo = `${window.location.origin}${window.location.pathname}`;
+  const passwordRecoveryRedirectTo = `${redirectTo}?type=recovery`;
   const needsPassword = mode === "signin" || mode === "signup";
   const captchaAction =
     mode === "signup"
@@ -118,7 +119,7 @@ export default function LoginScreen({
       } else if (mode === "forgot") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
           ...captchaOptions,
-          redirectTo
+          redirectTo: passwordRecoveryRedirectTo
         });
 
         if (resetError) {

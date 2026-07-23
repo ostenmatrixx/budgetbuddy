@@ -1,9 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import BrandIcon from "./components/BrandIcon";
 import LoginScreen from "./components/LoginScreen";
+import LandingPage from "./components/LandingPage";
 import PasswordRecoveryScreen from "./components/PasswordRecoveryScreen";
-import type { ThemeMode } from "./components/ThemeToggle";
+import ThemeToggle, { type ThemeMode } from "./components/ThemeToggle";
 import { UserSettingsProvider } from "./contexts/UserSettingsContext";
+import { usePwaInstall } from "./hooks/usePwaInstall";
 import { getSupabaseClient } from "./lib/supabaseClient";
 
 const themeStorageKey = "budgetbuddy-theme";
@@ -24,35 +27,43 @@ function getInitialTheme(): ThemeMode {
 }
 
 export default function App() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
-  const [configurationError, setConfigurationError] = useState("");
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const [isBrowserRecovery] = useState(isPasswordRecoveryRequest);
+  const { isStandalone } = usePwaInstall();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
 
+  function toggleTheme() {
+    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  }
+
+  if (!isStandalone && !isBrowserRecovery) {
+    return <LandingPage theme={theme} onToggleTheme={toggleTheme} />;
+  }
+
+  return (
+    <InstalledApp browserRecoveryOnly={!isStandalone} theme={theme} onToggleTheme={toggleTheme} />
+  );
+}
+
+interface InstalledAppProps {
+  browserRecoveryOnly: boolean;
+  theme: ThemeMode;
+  onToggleTheme: () => void;
+}
+
+function InstalledApp({ browserRecoveryOnly, onToggleTheme, theme }: InstalledAppProps) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [configurationError, setConfigurationError] = useState("");
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+
   useEffect(() => {
     try {
       const supabase = getSupabaseClient();
-
-      supabase.auth
-        .getSession()
-        .then(({ data, error }) => {
-          if (error) {
-            setConfigurationError(error.message);
-            return;
-          }
-
-          setSession(data.session);
-        })
-        .catch((error: unknown) => {
-          setConfigurationError(error instanceof Error ? error.message : "Unable to load session.");
-        })
-        .finally(() => setIsLoadingSession(false));
 
       const {
         data: { subscription }
@@ -63,6 +74,24 @@ export default function App() {
         setSession(nextSession);
       });
 
+      supabase.auth
+        .getSession()
+        .then(({ data, error }) => {
+          if (error) {
+            setConfigurationError(error.message);
+            return;
+          }
+
+          setSession(data.session);
+          if (browserRecoveryOnly && data.session) {
+            setIsPasswordRecovery(true);
+          }
+        })
+        .catch((error: unknown) => {
+          setConfigurationError(error instanceof Error ? error.message : "Unable to load session.");
+        })
+        .finally(() => setIsLoadingSession(false));
+
       return () => subscription.unsubscribe();
     } catch (error) {
       setConfigurationError(
@@ -70,14 +99,10 @@ export default function App() {
       );
       setIsLoadingSession(false);
     }
-  }, []);
+  }, [browserRecoveryOnly]);
 
   async function handleLogout() {
     await getSupabaseClient().auth.signOut();
-  }
-
-  function toggleTheme() {
-    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
   }
 
   if (isLoadingSession) {
@@ -88,8 +113,26 @@ export default function App() {
     return (
       <PasswordRecoveryScreen
         theme={theme}
-        onRecovered={() => setIsPasswordRecovery(false)}
-        onToggleTheme={toggleTheme}
+        onRecovered={() => {
+          if (browserRecoveryOnly) {
+            window.history.replaceState({}, "", "/");
+            window.location.reload();
+            return;
+          }
+
+          setIsPasswordRecovery(false);
+        }}
+        onToggleTheme={onToggleTheme}
+      />
+    );
+  }
+
+  if (browserRecoveryOnly) {
+    return (
+      <RecoveryLinkError
+        configurationError={configurationError}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
       />
     );
   }
@@ -102,7 +145,7 @@ export default function App() {
           userId={session.user.id}
           userEmail={session.user.email}
           onLogout={handleLogout}
-          onToggleTheme={toggleTheme}
+          onToggleTheme={onToggleTheme}
         />
       </Suspense>
     </UserSettingsProvider>
@@ -110,8 +153,60 @@ export default function App() {
     <LoginScreen
       configurationError={configurationError}
       theme={theme}
-      onToggleTheme={toggleTheme}
+      onToggleTheme={onToggleTheme}
     />
+  );
+}
+
+function isPasswordRecoveryRequest() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const queryType = new URLSearchParams(window.location.search).get("type");
+  const hashType = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("type");
+  return queryType === "recovery" || hashType === "recovery";
+}
+
+function RecoveryLinkError({
+  configurationError,
+  onToggleTheme,
+  theme
+}: {
+  configurationError: string;
+  onToggleTheme: () => void;
+  theme: ThemeMode;
+}) {
+  return (
+    <main className="flex min-h-screen flex-col bg-background text-on-background">
+      <header className="flex h-14 items-center justify-between border-b border-surface-variant bg-surface px-margin-mobile md:px-margin-desktop">
+        <div className="flex items-center gap-2 font-bold text-primary">
+          <BrandIcon className="h-7 w-7 shrink-0" />
+          <span className="text-headline-md">BudgetBuddy</span>
+        </div>
+        <ThemeToggle compact theme={theme} onToggle={onToggleTheme} />
+      </header>
+      <section className="flex flex-1 items-center justify-center px-gutter py-xl">
+        <div className="app-surface w-full max-w-[480px] p-xl text-center">
+          <span className="material-symbols-outlined text-[36px] text-primary" aria-hidden="true">
+            warning
+          </span>
+          <h1 className="mt-md text-headline-lg font-headline-lg">
+            This recovery link can’t be used
+          </h1>
+          <p className="mt-sm text-body-md text-on-surface-variant">
+            {configurationError ||
+              "It may have expired or already been completed. Request a new link from the installed BudgetBuddy app."}
+          </p>
+          <a
+            className="mt-xl inline-flex h-12 items-center rounded-lg bg-primary px-lg font-bold text-on-primary"
+            href="/"
+          >
+            Return to BudgetBuddy
+          </a>
+        </div>
+      </section>
+    </main>
   );
 }
 

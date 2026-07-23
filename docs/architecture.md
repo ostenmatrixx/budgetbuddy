@@ -53,6 +53,9 @@ The persisted-session threat tradeoff and alternatives are recorded in [`securit
 
 ### PWA and monitoring
 
+- Regular browser navigation renders the public install landing page. Authentication and dashboard
+  initialization are gated to standalone display mode; password-recovery URLs are the only browser
+  exception so email recovery remains usable. This is a UX boundary, not an authorization control.
 - The service worker caches only the app shell and hashed same-origin static assets. Navigation is network-first and falls back to the shell or dedicated offline page.
 - Writes are disabled while the browser reports it is offline. There is no background sync or persistent offline financial store.
 - A waiting service worker activates only after an explicit update action.

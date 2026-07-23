@@ -16,7 +16,8 @@ BudgetBuddy is a privacy-conscious personal finance PWA for tracking income, ess
 - Formats dates and money from each account's currency, locale, and timezone settings
 - Handles confirmation, recovery, password changes, and password-reauthenticated account deletion
 - Exports fresh owner-scoped data as versioned JSON or spreadsheet-safe RFC-4180 CSV
-- Installs as a PWA while keeping financial records out of browser caches and background sync
+- Uses an install-first landing page and opens the account dashboard only in standalone PWA mode
+- Keeps financial records out of browser caches and background sync
 - Preserves loaded data when offline, blocks writes, and provides explicit update and retry actions
 
 ## Production engineering
