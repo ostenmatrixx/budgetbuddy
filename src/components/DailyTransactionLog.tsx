@@ -1,11 +1,10 @@
-import { formatCurrency, normalizeTransactionSubcategory } from "../lib/budget";
-import {
-  transactionTypeShortLabels,
-  type Transaction
-} from "../types/transaction";
+import { useUserSettings } from "../contexts/UserSettingsContext";
+import { normalizeTransactionSubcategory } from "../lib/budget";
+import { transactionTypeShortLabels, type Transaction } from "../types/transaction";
 
 interface DailyTransactionLogProps {
   date: string;
+  isWriteDisabled?: boolean;
   transactions: Transaction[];
   onClose: () => void;
   onDelete: (transaction: Transaction) => void;
@@ -14,17 +13,19 @@ interface DailyTransactionLogProps {
 
 export default function DailyTransactionLog({
   date,
+  isWriteDisabled = false,
   transactions,
   onClose,
   onDelete,
   onEdit
 }: DailyTransactionLogProps) {
+  const { formatCurrency, formatDate } = useUserSettings();
   return (
     <section className="app-surface animate-card-in p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-on-surface">Daily Log</h2>
-          <p className="text-sm text-on-surface-variant">{date}</p>
+          <p className="text-sm text-on-surface-variant">{formatDate(date)}</p>
         </div>
         <button
           className="icon-control motion-icon-button h-9 w-9 shrink-0"
@@ -69,6 +70,7 @@ export default function DailyTransactionLog({
                 <button
                   aria-label="Edit transaction"
                   className="icon-control motion-icon-button h-9 w-9"
+                  disabled={isWriteDisabled}
                   title="Edit transaction"
                   type="button"
                   onClick={() => onEdit(transaction)}
@@ -80,6 +82,7 @@ export default function DailyTransactionLog({
                 <button
                   aria-label="Delete transaction"
                   className="motion-icon-button grid h-9 w-9 place-items-center rounded-lg border border-outline-variant bg-surface-container-lowest text-primary transition hover:bg-error-container focus:outline-none focus:ring-2 focus:ring-primary/10"
+                  disabled={isWriteDisabled}
                   title="Delete transaction"
                   type="button"
                   onClick={() => onDelete(transaction)}

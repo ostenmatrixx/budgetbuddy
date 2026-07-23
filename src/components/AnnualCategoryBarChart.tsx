@@ -1,4 +1,5 @@
-import { formatCurrency, type AnnualReport, type AnnualMonthReport } from "../lib/budget";
+import { useUserSettings } from "../contexts/UserSettingsContext";
+import { type AnnualReport, type AnnualMonthReport } from "../lib/budget";
 
 interface AnnualCategoryBarChartProps {
   report: AnnualReport;
@@ -19,6 +20,7 @@ const categories: Array<{
 ];
 
 export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChartProps) {
+  const { formatCurrency } = useUserSettings();
   return (
     <section className="app-surface animate-card-in min-w-0 overflow-hidden p-4 md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -37,7 +39,10 @@ export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChar
       <div className="mt-5 w-full overflow-x-auto pb-2">
         <div className="grid min-w-[680px] grid-cols-12 gap-2.5 lg:min-w-0">
           {report.months.map((month, monthIndex) => (
-            <div className={`animate-slide-up stagger-${(monthIndex % 6) + 1} flex flex-col gap-2`} key={month.month}>
+            <div
+              className={`animate-slide-up stagger-${(monthIndex % 6) + 1} flex flex-col gap-2`}
+              key={month.month}
+            >
               <div className="flex h-56 items-end justify-center gap-1.5 rounded-lg bg-surface-container px-2 py-3 ring-1 ring-surface-variant">
                 {categories.map((category) => {
                   const value = month[category.key];

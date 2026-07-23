@@ -8,7 +8,6 @@ import {
   calculateSubcategoryGroups,
   clampTransactionPage,
   filterTransactionsByMonth,
-  formatCurrency,
   UNCATEGORIZED_SUBCATEGORY_LABEL,
   normalizeTransactionSubcategory,
   paginateTransactions,
@@ -17,15 +16,20 @@ import {
   validateBudgetPreferenceInput,
   validateTransactionInput
 } from "./budget";
-import type {
-  Transaction,
-  TransactionSubcategoriesByType,
-  TransactionSubcategoryOption
+import { formatCurrencyForSettings } from "./formatting";
+import {
+  TRANSACTION_DESCRIPTION_MAX_LENGTH,
+  TRANSACTION_NOTES_MAX_LENGTH,
+  TRANSACTION_SUBCATEGORY_MAX_LENGTH,
+  type Transaction,
+  type TransactionSubcategoriesByType,
+  type TransactionSubcategoryOption
 } from "../types/transaction";
 
 const transactions: Transaction[] = [
   {
     id: "1",
+    version: 1,
     type: "income",
     amount: 50000,
     date: "2026-05-05",
@@ -36,6 +40,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "2",
+    version: 1,
     type: "bills",
     amount: 12000,
     date: "2026-05-08",
@@ -46,6 +51,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "3",
+    version: 1,
     type: "non_essentials",
     amount: 4000,
     date: "2026-05-09",
@@ -56,6 +62,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "4",
+    version: 1,
     type: "savings",
     amount: 15000,
     date: "2026-05-10",
@@ -66,6 +73,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "5",
+    version: 1,
     type: "income",
     amount: 10000,
     date: "2026-04-30",
@@ -80,6 +88,7 @@ const annualTransactions: Transaction[] = [
   ...transactions,
   {
     id: "6",
+    version: 1,
     type: "income",
     amount: 45000,
     date: "2026-01-15",
@@ -90,6 +99,7 @@ const annualTransactions: Transaction[] = [
   },
   {
     id: "7",
+    version: 1,
     type: "bills",
     amount: 18000,
     date: "2026-01-16",
@@ -100,6 +110,7 @@ const annualTransactions: Transaction[] = [
   },
   {
     id: "8",
+    version: 1,
     type: "non_essentials",
     amount: 3500,
     date: "2026-01-20",
@@ -110,6 +121,7 @@ const annualTransactions: Transaction[] = [
   },
   {
     id: "9",
+    version: 1,
     type: "savings",
     amount: 9000,
     date: "2026-01-25",
@@ -120,6 +132,7 @@ const annualTransactions: Transaction[] = [
   },
   {
     id: "10",
+    version: 1,
     type: "income",
     amount: 99999,
     date: "2025-01-15",
@@ -332,6 +345,7 @@ describe("subcategory helpers", () => {
         ...transactions,
         {
           id: "6",
+          version: 1,
           type: "bills",
           subcategory: "House",
           amount: 8000,
@@ -343,6 +357,7 @@ describe("subcategory helpers", () => {
         },
         {
           id: "7",
+          version: 1,
           type: "bills",
           subcategory: "Credit Card",
           amount: 5000,
@@ -371,6 +386,7 @@ describe("subcategory helpers", () => {
         ...transactions,
         {
           id: "6",
+          version: 1,
           type: "savings",
           subcategory: "Emergency Funds",
           amount: 5000,
@@ -407,6 +423,7 @@ describe("subcategory helpers", () => {
         ...transactions,
         {
           id: "6",
+          version: 1,
           type: "bills",
           subcategory: "Utilities",
           amount: 8000,
@@ -418,6 +435,7 @@ describe("subcategory helpers", () => {
         },
         {
           id: "7",
+          version: 1,
           type: "bills",
           subcategory: "Archived card",
           amount: 5000,
@@ -434,11 +452,13 @@ describe("subcategory helpers", () => {
       subcategoriesByType
     );
 
-    expect(result.map((group) => ({
-      label: group.label,
-      total: group.total,
-      transactionIds: group.transactions.map((transaction) => transaction.id)
-    }))).toEqual([
+    expect(
+      result.map((group) => ({
+        label: group.label,
+        total: group.total,
+        transactionIds: group.transactions.map((transaction) => transaction.id)
+      }))
+    ).toEqual([
       { label: "Uncategorized", total: 12000, transactionIds: ["2"] },
       { label: "Utilities", total: 8000, transactionIds: ["6"] },
       { label: "Rent", total: 0, transactionIds: [] },
@@ -452,6 +472,7 @@ describe("subcategory helpers", () => {
         ...transactions,
         {
           id: "6",
+          version: 1,
           type: "income",
           subcategory: "Side work",
           amount: 5000,
@@ -468,11 +489,13 @@ describe("subcategory helpers", () => {
       subcategoriesByType
     );
 
-    expect(result.map((group) => ({
-      label: group.label,
-      total: group.total,
-      transactionIds: group.transactions.map((transaction) => transaction.id)
-    }))).toEqual([
+    expect(
+      result.map((group) => ({
+        label: group.label,
+        total: group.total,
+        transactionIds: group.transactions.map((transaction) => transaction.id)
+      }))
+    ).toEqual([
       { label: "Uncategorized", total: 50000, transactionIds: ["1"] },
       { label: "Paycheck", total: 0, transactionIds: [] },
       { label: "Side work", total: 5000, transactionIds: ["6"] }
@@ -480,23 +503,14 @@ describe("subcategory helpers", () => {
   });
 
   it("excludes archived subcategories from empty cards unless transactions use them", () => {
-    const result = calculateSubcategoryGroups(
-      transactions,
-      2026,
-      5,
-      "savings",
-      {
-        savings: [
-          createSubcategory("active", "savings", "Emergency fund"),
-          createSubcategory("archived", "savings", "Old vault", false)
-        ]
-      }
-    );
+    const result = calculateSubcategoryGroups(transactions, 2026, 5, "savings", {
+      savings: [
+        createSubcategory("active", "savings", "Emergency fund"),
+        createSubcategory("archived", "savings", "Old vault", false)
+      ]
+    });
 
-    expect(result.map((group) => group.label)).toEqual([
-      "Uncategorized",
-      "Emergency fund"
-    ]);
+    expect(result.map((group) => group.label)).toEqual(["Uncategorized", "Emergency fund"]);
   });
 
   it("omits the uncategorized group when there are no uncategorized entries", () => {
@@ -504,6 +518,7 @@ describe("subcategory helpers", () => {
       [
         {
           id: "custom-1",
+          version: 1,
           type: "bills",
           subcategory: "Utilities",
           amount: 2500,
@@ -536,13 +551,7 @@ describe("subcategory helpers", () => {
   });
 
   it("keeps a valid selected subcategory and falls back when it is unavailable", () => {
-    const groups = calculateSubcategoryGroups(
-      transactions,
-      2026,
-      5,
-      "income",
-      subcategoriesByType
-    );
+    const groups = calculateSubcategoryGroups(transactions, 2026, 5, "income", subcategoriesByType);
 
     expect(resolveSelectedSubcategoryLabel(groups, "Paycheck")).toBe("Paycheck");
     expect(resolveSelectedSubcategoryLabel(groups, "Missing")).toBe("Uncategorized");
@@ -554,6 +563,7 @@ describe("transaction list pagination", () => {
   const paginatedTransactions: Transaction[] = [
     {
       id: "1",
+      version: 1,
       type: "income",
       amount: 1000,
       date: "2026-05-01",
@@ -564,6 +574,7 @@ describe("transaction list pagination", () => {
     },
     {
       id: "2",
+      version: 1,
       type: "income",
       amount: 1000,
       date: "2026-05-02",
@@ -574,6 +585,7 @@ describe("transaction list pagination", () => {
     },
     {
       id: "3",
+      version: 1,
       type: "income",
       amount: 1000,
       date: "2026-05-02",
@@ -584,6 +596,7 @@ describe("transaction list pagination", () => {
     },
     {
       id: "4",
+      version: 1,
       type: "income",
       amount: 1000,
       date: "2026-05-03",
@@ -594,6 +607,7 @@ describe("transaction list pagination", () => {
     },
     {
       id: "5",
+      version: 1,
       type: "income",
       amount: 1000,
       date: "2026-05-04",
@@ -604,6 +618,7 @@ describe("transaction list pagination", () => {
     },
     {
       id: "6",
+      version: 1,
       type: "income",
       amount: 1000,
       date: "2026-05-05",
@@ -615,25 +630,15 @@ describe("transaction list pagination", () => {
   ];
 
   it("sorts newest transactions by date descending and created date descending", () => {
-    expect(sortTransactionsForDisplay(paginatedTransactions, "newest").map(({ id }) => id)).toEqual([
-      "6",
-      "5",
-      "4",
-      "3",
-      "2",
-      "1"
-    ]);
+    expect(sortTransactionsForDisplay(paginatedTransactions, "newest").map(({ id }) => id)).toEqual(
+      ["6", "5", "4", "3", "2", "1"]
+    );
   });
 
   it("sorts oldest transactions by date ascending and created date ascending", () => {
-    expect(sortTransactionsForDisplay(paginatedTransactions, "oldest").map(({ id }) => id)).toEqual([
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6"
-    ]);
+    expect(sortTransactionsForDisplay(paginatedTransactions, "oldest").map(({ id }) => id)).toEqual(
+      ["1", "2", "3", "4", "5", "6"]
+    );
   });
 
   it("paginates transactions to five items per page", () => {
@@ -700,6 +705,36 @@ describe("validateTransactionInput", () => {
     });
   });
 
+  it("accepts transaction text at the database length boundaries", () => {
+    const result = validateTransactionInput({
+      type: "income",
+      amount: "1",
+      date: "2026-05-15",
+      description: "d".repeat(TRANSACTION_DESCRIPTION_MAX_LENGTH),
+      subcategory: "s".repeat(TRANSACTION_SUBCATEGORY_MAX_LENGTH),
+      notes: "n".repeat(TRANSACTION_NOTES_MAX_LENGTH)
+    });
+
+    expect(result.isValid).toBe(true);
+  });
+
+  it("rejects transaction text above the database length limits", () => {
+    const result = validateTransactionInput({
+      type: "income",
+      amount: "1",
+      date: "2026-05-15",
+      description: "d".repeat(TRANSACTION_DESCRIPTION_MAX_LENGTH + 1),
+      subcategory: "s".repeat(TRANSACTION_SUBCATEGORY_MAX_LENGTH + 1),
+      notes: "n".repeat(TRANSACTION_NOTES_MAX_LENGTH + 1)
+    });
+
+    expect(result.errors).toEqual({
+      description: "Use 200 characters or fewer.",
+      notes: "Use 2,000 characters or fewer.",
+      subcategory: "Use 60 characters or fewer."
+    });
+  });
+
   it("allows missing subcategories for every transaction type", () => {
     const result = validateTransactionInput({
       type: "bills",
@@ -722,22 +757,28 @@ describe("validateTransactionInput", () => {
       savings: [createSubcategory("savings-emergency", "savings", "Emergency fund")]
     };
 
-    const invalidSubcategory = validateTransactionInput({
-      type: "savings",
-      amount: "3000",
-      date: "2026-05-16",
-      description: "Transfer",
-      subcategory: "Utilities",
-      notes: ""
-    }, options);
-    const validSubcategory = validateTransactionInput({
-      type: "income",
-      amount: "3000",
-      date: "2026-05-16",
-      description: "Salary",
-      subcategory: "Paycheck",
-      notes: ""
-    }, options);
+    const invalidSubcategory = validateTransactionInput(
+      {
+        type: "savings",
+        amount: "3000",
+        date: "2026-05-16",
+        description: "Transfer",
+        subcategory: "Utilities",
+        notes: ""
+      },
+      options
+    );
+    const validSubcategory = validateTransactionInput(
+      {
+        type: "income",
+        amount: "3000",
+        date: "2026-05-16",
+        description: "Salary",
+        subcategory: "Paycheck",
+        notes: ""
+      },
+      options
+    );
 
     expect(invalidSubcategory.errors.subcategory).toBe("Choose a valid subcategory.");
     expect(validSubcategory.value).toMatchObject({
@@ -747,9 +788,9 @@ describe("validateTransactionInput", () => {
   });
 });
 
-describe("formatCurrency", () => {
-  it("formats values as Philippine pesos by default", () => {
-    expect(formatCurrency(1234.5)).toBe("₱1,234.50");
+describe("settings-aware currency formatting", () => {
+  it("formats the default account settings as Philippine pesos", () => {
+    expect(formatCurrencyForSettings(1234.5)).toBe("₱1,234.50");
   });
 });
 

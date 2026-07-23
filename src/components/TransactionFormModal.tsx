@@ -1,10 +1,13 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import {
   getActiveSubcategoryNames,
   normalizeSubcategoryLabel,
   validateTransactionInput
 } from "../lib/budget";
+import { DEFAULT_TIME_ZONE, toDateInputValue } from "../lib/date";
 import {
+  TRANSACTION_DESCRIPTION_MAX_LENGTH,
+  TRANSACTION_NOTES_MAX_LENGTH,
   transactionTypeShortLabels,
   transactionTypes,
   type Transaction,
@@ -15,21 +18,28 @@ import {
   type TransactionSubcategoryOption,
   type TransactionType
 } from "../types/transaction";
+import AccessibleDialog from "./AccessibleDialog";
 
 interface TransactionFormModalProps {
   defaultDate?: string;
   initialType?: TransactionType;
+  isWriteDisabled?: boolean;
   subcategoriesByType: TransactionSubcategoriesByType;
   transaction?: Transaction;
+  currencySymbol?: string;
+  timeZone?: string;
   onClose: () => void;
-  onSubmit: (draft: TransactionDraft) => void;
+  onSubmit: (draft: TransactionDraft) => Promise<void>;
 }
 
 export default function TransactionFormModal({
   defaultDate,
   initialType,
+  isWriteDisabled = false,
   subcategoriesByType,
   transaction,
+  currencySymbol = "₱",
+  timeZone = DEFAULT_TIME_ZONE,
   onClose,
   onSubmit
 }: TransactionFormModalProps) {
@@ -38,11 +48,14 @@ export default function TransactionFormModal({
     type: transaction?.type ?? initialType ?? "",
     subcategory: initialSubcategory,
     amount: transaction ? String(transaction.amount) : "",
-    date: transaction?.date ?? defaultDate ?? new Date().toISOString().slice(0, 10),
+    date: transaction?.date ?? defaultDate ?? toDateInputValue(new Date(), timeZone),
     description: transaction?.description ?? "",
     notes: transaction?.notes ?? ""
   }));
   const [errors, setErrors] = useState<TransactionErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const isSubmittingRef = useRef(false);
 
   function updateValue(field: keyof TransactionFormValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -54,8 +67,18 @@ export default function TransactionFormModal({
     setErrors((current) => ({ ...current, type: undefined, subcategory: undefined }));
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isWriteDisabled) {
+      setSubmitError("Reconnect to save this transaction.");
+      return;
+    }
+
+    if (isSubmittingRef.current) {
+      return;
+    }
+
     const result = validateTransactionInput(values, validationSubcategoriesByType);
 
     if (!result.isValid || !result.value) {
@@ -63,7 +86,24 @@ export default function TransactionFormModal({
       return;
     }
 
-    onSubmit(result.value);
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    try {
+      await onSubmit(result.value);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Unable to save this transaction.");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleClose() {
+    if (!isSubmittingRef.current) {
+      onClose();
+    }
   }
 
   const selectedType = transactionTypes.find((type) => type === values.type);
@@ -75,10 +115,18 @@ export default function TransactionFormModal({
     : subcategoriesByType;
 
   return (
-    <div className="motion-backdrop fixed inset-0 z-50 flex items-end bg-black-bean/45 px-3 py-4 backdrop-blur-[2px] sm:items-center sm:justify-center">
+    <AccessibleDialog
+      className="animate-modal-in max-h-[calc(100svh-2rem)] w-full overflow-y-auto rounded-xl border border-surface-variant bg-surface-container-lowest p-0 shadow-[0_24px_90px_rgba(50,24,24,0.24)] sm:max-w-3xl"
+      descriptionId="transaction-form-description"
+      isCloseBlocked={isSubmitting}
+      labelId="transaction-form-title"
+      open
+      onRequestClose={handleClose}
+    >
       <form
-        className="animate-modal-in max-h-[calc(100svh-2rem)] w-full overflow-y-auto rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_24px_90px_rgba(50,24,24,0.24)] sm:max-w-3xl"
-        onSubmit={handleSubmit}
+        className="w-full"
+        aria-busy={isSubmitting}
+        onSubmit={(event) => void handleSubmit(event)}
       >
         <div className="flex items-start justify-between gap-4 border-b border-surface-variant p-5">
           <div className="flex min-w-0 items-start gap-3">
@@ -92,10 +140,10 @@ export default function TransactionFormModal({
               <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
                 {transaction ? "Edit entry" : "New entry"}
               </p>
-              <h2 className="mt-1 text-2xl font-bold text-on-surface">
+              <h2 className="mt-1 text-2xl font-bold text-on-surface" id="transaction-form-title">
                 Transaction details
               </h2>
-              <p className="mt-1 text-sm text-on-surface-variant">
+              <p className="mt-1 text-sm text-on-surface-variant" id="transaction-form-description">
                 Add the amount, category, and date for your budget record.
               </p>
             </div>
@@ -105,7 +153,8 @@ export default function TransactionFormModal({
             className="icon-control motion-icon-button shrink-0"
             title="Close"
             type="button"
-            onClick={onClose}
+            disabled={isSubmitting}
+            onClick={handleClose}
           >
             <MaterialIcon name="close" />
           </button>
@@ -113,12 +162,19 @@ export default function TransactionFormModal({
 
         <div className="p-5">
           <section className="rounded-xl border border-surface-variant bg-surface-container-lowest p-6 text-center">
-            <label className="block text-xs font-bold uppercase tracking-[0.05em] text-outline">
+            <label
+              className="block text-xs font-bold uppercase tracking-[0.05em] text-outline"
+              htmlFor="transaction-amount"
+            >
               Transaction amount
               <span className="mt-3 flex items-center justify-center gap-3">
-                <span className="text-4xl font-bold text-primary">$</span>
+                <span className="text-4xl font-bold text-primary">{currencySymbol}</span>
                 <input
+                  aria-label="Transaction amount"
+                  aria-describedby={errors.amount ? "transaction-amount-error" : undefined}
+                  aria-invalid={Boolean(errors.amount)}
                   className="w-full max-w-[16rem] border-0 bg-transparent p-0 text-center text-4xl font-bold text-on-surface outline-none placeholder:text-surface-variant focus:ring-0"
+                  id="transaction-amount"
                   min="0"
                   placeholder="0.00"
                   step="0.01"
@@ -129,19 +185,29 @@ export default function TransactionFormModal({
               </span>
             </label>
             {errors.amount ? (
-              <span className="mt-2 block text-xs font-semibold text-maroon">
+              <span
+                className="mt-2 block text-xs font-semibold text-maroon"
+                id="transaction-amount-error"
+              >
                 {errors.amount}
               </span>
             ) : null}
           </section>
 
           <div className="mt-5 grid grid-cols-12 gap-4">
-            <label className="col-span-12 text-xs font-bold uppercase tracking-[0.05em] text-outline sm:col-span-6">
+            <label
+              className="col-span-12 text-xs font-bold uppercase tracking-[0.05em] text-outline sm:col-span-6"
+              htmlFor="transaction-type"
+            >
               Type
               <span className="input-well mt-2 flex items-center gap-2 rounded-xl px-3 py-2">
                 <MaterialIcon className="text-[20px] text-outline" name="category" />
                 <select
+                  aria-label="Type"
+                  aria-describedby={errors.type ? "transaction-type-error" : undefined}
+                  aria-invalid={Boolean(errors.type)}
                   className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold text-on-surface outline-none focus:ring-0"
+                  id="transaction-type"
                   value={values.type}
                   onChange={(event) => updateType(event.target.value)}
                 >
@@ -154,19 +220,32 @@ export default function TransactionFormModal({
                 </select>
               </span>
               {errors.type ? (
-                <span className="mt-1 block text-xs normal-case tracking-normal text-maroon">
+                <span
+                  className="mt-1 block text-xs normal-case tracking-normal text-maroon"
+                  id="transaction-type-error"
+                >
                   {errors.type}
                 </span>
               ) : null}
             </label>
 
             {selectedType ? (
-              <label className="col-span-12 text-xs font-bold uppercase tracking-[0.05em] text-outline sm:col-span-6">
-                Subcategory <span className="font-semibold normal-case tracking-normal">(optional)</span>
+              <label
+                className="col-span-12 text-xs font-bold uppercase tracking-[0.05em] text-outline sm:col-span-6"
+                htmlFor="transaction-subcategory"
+              >
+                Subcategory{" "}
+                <span className="font-semibold normal-case tracking-normal">(optional)</span>
                 <span className="input-well mt-2 flex items-center gap-2 rounded-xl px-3 py-2">
                   <MaterialIcon className="text-[20px] text-outline" name="sell" />
                   <select
+                    aria-label="Subcategory"
+                    aria-describedby={
+                      errors.subcategory ? "transaction-subcategory-error" : undefined
+                    }
+                    aria-invalid={Boolean(errors.subcategory)}
                     className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold text-on-surface outline-none focus:ring-0"
+                    id="transaction-subcategory"
                     value={values.subcategory ?? ""}
                     onChange={(event) => updateValue("subcategory", event.target.value)}
                   >
@@ -184,81 +263,138 @@ export default function TransactionFormModal({
                   </select>
                 </span>
                 {errors.subcategory ? (
-                  <span className="mt-1 block text-xs normal-case tracking-normal text-maroon">
+                  <span
+                    className="mt-1 block text-xs normal-case tracking-normal text-maroon"
+                    id="transaction-subcategory-error"
+                  >
                     {errors.subcategory}
                   </span>
                 ) : null}
               </label>
             ) : null}
 
-            <label className="col-span-12 text-xs font-bold uppercase tracking-[0.05em] text-outline sm:col-span-6">
+            <label
+              className="col-span-12 text-xs font-bold uppercase tracking-[0.05em] text-outline sm:col-span-6"
+              htmlFor="transaction-date"
+            >
               Date
               <span className="input-well mt-2 flex items-center gap-2 rounded-xl px-3 py-2">
                 <MaterialIcon className="text-[20px] text-outline" name="calendar_today" />
                 <input
+                  aria-label="Date"
+                  aria-describedby={errors.date ? "transaction-date-error" : undefined}
+                  aria-invalid={Boolean(errors.date)}
                   className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold text-on-surface outline-none focus:ring-0"
+                  id="transaction-date"
                   type="date"
                   value={values.date}
                   onChange={(event) => updateValue("date", event.target.value)}
                 />
               </span>
               {errors.date ? (
-                <span className="mt-1 block text-xs normal-case tracking-normal text-maroon">
+                <span
+                  className="mt-1 block text-xs normal-case tracking-normal text-maroon"
+                  id="transaction-date-error"
+                >
                   {errors.date}
                 </span>
               ) : null}
             </label>
 
-            <label className="col-span-12 text-xs font-bold uppercase tracking-[0.05em] text-outline sm:col-span-6">
+            <label
+              className="col-span-12 text-xs font-bold uppercase tracking-[0.05em] text-outline sm:col-span-6"
+              htmlFor="transaction-description"
+            >
               Description
               <span className="input-well mt-2 flex items-center gap-2 rounded-xl px-3 py-2">
                 <MaterialIcon className="text-[20px] text-outline" name="notes" />
                 <input
+                  aria-label="Description"
+                  aria-describedby={
+                    errors.description ? "transaction-description-error" : undefined
+                  }
+                  aria-invalid={Boolean(errors.description)}
                   className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold text-on-surface outline-none placeholder:text-outline focus:ring-0"
+                  id="transaction-description"
+                  maxLength={TRANSACTION_DESCRIPTION_MAX_LENGTH}
                   type="text"
                   value={values.description}
                   onChange={(event) => updateValue("description", event.target.value)}
                 />
               </span>
               {errors.description ? (
-                <span className="mt-1 block text-xs normal-case tracking-normal text-maroon">
+                <span
+                  className="mt-1 block text-xs normal-case tracking-normal text-maroon"
+                  id="transaction-description-error"
+                >
                   {errors.description}
                 </span>
               ) : null}
             </label>
           </div>
 
-          <label className="mt-4 block text-xs font-bold uppercase tracking-[0.05em] text-outline">
+          <label
+            className="mt-4 block text-xs font-bold uppercase tracking-[0.05em] text-outline"
+            htmlFor="transaction-notes"
+          >
             Notes
             <span className="input-well mt-2 flex items-start gap-2 rounded-xl px-3 py-3">
               <MaterialIcon className="mt-0.5 text-[20px] text-outline" name="receipt_long" />
               <textarea
+                aria-label="Notes"
+                aria-describedby={errors.notes ? "transaction-notes-error" : undefined}
+                aria-invalid={Boolean(errors.notes)}
                 className="min-h-24 min-w-0 flex-1 resize-y border-0 bg-transparent p-0 text-sm font-semibold text-on-surface outline-none placeholder:text-outline focus:ring-0"
+                id="transaction-notes"
+                maxLength={TRANSACTION_NOTES_MAX_LENGTH}
                 value={values.notes}
                 onChange={(event) => updateValue("notes", event.target.value)}
               />
             </span>
+            {errors.notes ? (
+              <span
+                className="mt-1 block text-xs normal-case tracking-normal text-maroon"
+                id="transaction-notes-error"
+              >
+                {errors.notes}
+              </span>
+            ) : null}
           </label>
+
+          {submitError ? (
+            <p
+              className="mt-4 rounded-lg bg-error-container px-3 py-2 text-sm font-semibold text-on-error-container"
+              role="alert"
+            >
+              {submitError}
+            </p>
+          ) : null}
 
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               className="motion-button rounded-lg border border-outline px-5 py-3 text-sm font-bold text-primary transition hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-primary/10"
               type="button"
-              onClick={onClose}
+              disabled={isSubmitting}
+              onClick={handleClose}
             >
               Cancel
             </button>
             <button
               className="motion-button motion-icon-button inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-bold text-on-primary shadow-sm transition hover:bg-black-bean focus:outline-none focus:ring-2 focus:ring-primary/20"
               type="submit"
+              disabled={isSubmitting || isWriteDisabled}
             >
-              <MaterialIcon className="text-[20px]" filled name="check_circle" />
-              Save entry
+              <MaterialIcon
+                className={`text-[20px] ${isSubmitting ? "animate-spin-soft" : ""}`}
+                filled={!isSubmitting}
+                name={isSubmitting ? "progress_activity" : "check_circle"}
+              />
+              {isSubmitting ? "Saving…" : "Save entry"}
             </button>
           </div>
         </div>
       </form>
-    </div>
+    </AccessibleDialog>
   );
 }
 
@@ -291,8 +427,8 @@ function getFormSubcategoryNames(
   const hasCurrentName =
     currentName &&
     !activeNames.some(
-      (name) => normalizeSubcategoryLabel(name).toLocaleLowerCase() ===
-        currentName.toLocaleLowerCase()
+      (name) =>
+        normalizeSubcategoryLabel(name).toLocaleLowerCase() === currentName.toLocaleLowerCase()
     );
 
   return hasCurrentName ? [...activeNames, currentName] : activeNames;

@@ -1,4 +1,5 @@
-import { formatCurrency, type CategoryPieSegment } from "../lib/budget";
+import { useUserSettings } from "../contexts/UserSettingsContext";
+import { type CategoryPieSegment } from "../lib/budget";
 
 interface CategoryPieChartProps {
   segments: CategoryPieSegment[];
@@ -7,6 +8,7 @@ interface CategoryPieChartProps {
 const segmentColors = ["#af101a", "#9e4039", "#fb877d", "#455b65", "#ffb3ac"];
 
 export default function CategoryPieChart({ segments }: CategoryPieChartProps) {
+  const { formatCurrency } = useUserSettings();
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   const topSegment = segments.find((segment) => segment.value > 0);
   const ringSegments = buildRingSegments(segments);

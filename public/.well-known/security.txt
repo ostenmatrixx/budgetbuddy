@@ -1,0 +1,4 @@
+Contact: https://github.com/ostenmatrixx/budget-tracker/security/advisories/new
+Expires: 2027-07-23T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://github.com/ostenmatrixx/budget-tracker/security/policy

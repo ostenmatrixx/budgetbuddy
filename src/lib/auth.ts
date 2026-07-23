@@ -1,5 +1,7 @@
 export type AuthMode = "signin" | "signup";
 
+export const MINIMUM_PASSWORD_LENGTH = 10;
+
 export interface AuthInputErrors {
   email?: string;
   password?: string;
@@ -22,7 +24,8 @@ export function validateAuthInput(
   password: string
 ): AuthInputResult {
   const normalizedEmail = email.trim().toLowerCase();
-  const nextPassword = password.trim();
+  // Passwords are opaque credentials. Never trim or otherwise normalize them.
+  const nextPassword = password;
   const errors: AuthInputErrors = {};
 
   if (!emailPattern.test(normalizedEmail)) {
@@ -31,8 +34,8 @@ export function validateAuthInput(
 
   if (!nextPassword) {
     errors.password = "Enter your password.";
-  } else if (mode === "signup" && nextPassword.length < 8) {
-    errors.password = "Use at least 8 characters.";
+  } else if (mode === "signup" && nextPassword.length < MINIMUM_PASSWORD_LENGTH) {
+    errors.password = `Use at least ${MINIMUM_PASSWORD_LENGTH} characters.`;
   }
 
   if (Object.keys(errors).length > 0) {
@@ -47,4 +50,33 @@ export function validateAuthInput(
       password: nextPassword
     }
   };
+}
+
+export interface PasswordInputErrors {
+  password?: string;
+  confirmation?: string;
+}
+
+export interface PasswordInputResult {
+  isValid: boolean;
+  errors: PasswordInputErrors;
+  value?: string;
+}
+
+export function validateNewPassword(password: string, confirmation: string): PasswordInputResult {
+  const errors: PasswordInputErrors = {};
+
+  if (password.length < MINIMUM_PASSWORD_LENGTH) {
+    errors.password = `Use at least ${MINIMUM_PASSWORD_LENGTH} characters.`;
+  }
+
+  if (confirmation !== password) {
+    errors.confirmation = "Passwords do not match.";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { isValid: false, errors };
+  }
+
+  return { isValid: true, errors: {}, value: password };
 }

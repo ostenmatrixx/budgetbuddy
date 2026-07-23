@@ -1,21 +1,20 @@
-import {
-  formatCurrency,
-  progressPercent,
-  type BudgetPreference,
-  type BudgetSummary
-} from "../lib/budget";
+import { progressPercent, type BudgetPreference, type BudgetSummary } from "../lib/budget";
+import { useUserSettings } from "../contexts/UserSettingsContext";
 
 interface BudgetAllocationCardsProps {
+  isWriteDisabled?: boolean;
   preference: BudgetPreference;
   summary: BudgetSummary;
   onEditTargets: () => void;
 }
 
 export default function BudgetAllocationCards({
+  isWriteDisabled = false,
   onEditTargets,
   preference,
   summary
 }: BudgetAllocationCardsProps) {
+  const { formatCurrency } = useUserSettings();
   const cards = [
     {
       label: `${preference.essentialsPercent}% Essentials`,
@@ -29,9 +28,7 @@ export default function BudgetAllocationCards({
       target: summary.savingsTarget,
       actual: summary.savingsSaved,
       remainingLabel:
-        summary.savingsSaved > summary.savingsTarget
-          ? "Saved beyond target"
-          : "Savings to target",
+        summary.savingsSaved > summary.savingsTarget ? "Saved beyond target" : "Savings to target",
       remaining: Math.abs(summary.savingsTarget - summary.savingsSaved),
       positiveOverTarget: true
     },
@@ -55,6 +52,7 @@ export default function BudgetAllocationCards({
         </div>
         <button
           className="motion-button motion-icon-button inline-flex w-fit items-center gap-2 rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-primary transition hover:border-outline hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-primary/10"
+          disabled={isWriteDisabled}
           type="button"
           onClick={onEditTargets}
         >
@@ -84,7 +82,9 @@ export default function BudgetAllocationCards({
                 </div>
                 <span
                   className={`rounded-full px-2.5 py-1 font-label-sm text-label-sm ${
-                    isOver ? "bg-error-container text-error" : "bg-surface-container text-on-surface-variant"
+                    isOver
+                      ? "bg-error-container text-error"
+                      : "bg-surface-container text-on-surface-variant"
                   }`}
                 >
                   {percent}%

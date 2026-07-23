@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateAuthInput } from "./auth";
+import { validateAuthInput, validateNewPassword } from "./auth";
 
 describe("validateAuthInput", () => {
   it("requires a valid email and password for sign in", () => {
@@ -16,7 +16,7 @@ describe("validateAuthInput", () => {
     expect(validateAuthInput("signup", "owner@example.com", "short")).toEqual({
       isValid: false,
       errors: {
-        password: "Use at least 8 characters."
+        password: "Use at least 10 characters."
       }
     });
   });
@@ -29,6 +29,37 @@ describe("validateAuthInput", () => {
         email: "owner@example.com",
         password: "password123"
       }
+    });
+  });
+
+  it("preserves password whitespace exactly", () => {
+    expect(validateAuthInput("signin", "Owner@Example.com", " pass phrase ")).toEqual({
+      isValid: true,
+      errors: {},
+      value: {
+        email: "owner@example.com",
+        password: " pass phrase "
+      }
+    });
+  });
+});
+
+describe("validateNewPassword", () => {
+  it("requires a ten-character matching password", () => {
+    expect(validateNewPassword("short", "different")).toEqual({
+      isValid: false,
+      errors: {
+        password: "Use at least 10 characters.",
+        confirmation: "Passwords do not match."
+      }
+    });
+  });
+
+  it("does not normalize the new password", () => {
+    expect(validateNewPassword(" space pass ", " space pass ")).toEqual({
+      isValid: true,
+      errors: {},
+      value: " space pass "
     });
   });
 });

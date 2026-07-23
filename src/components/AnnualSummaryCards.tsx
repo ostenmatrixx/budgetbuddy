@@ -1,10 +1,12 @@
-import { formatCurrency, type AnnualReport } from "../lib/budget";
+import { useUserSettings } from "../contexts/UserSettingsContext";
+import { type AnnualReport } from "../lib/budget";
 
 interface AnnualSummaryCardsProps {
   report: AnnualReport;
 }
 
 export default function AnnualSummaryCards({ report }: AnnualSummaryCardsProps) {
+  const { formatCurrency } = useUserSettings();
   const items = [
     { label: "Income", value: report.yearly.totalIncome },
     { label: "Essentials", value: report.yearly.billsSpent },

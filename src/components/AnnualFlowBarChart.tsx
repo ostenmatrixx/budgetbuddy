@@ -1,4 +1,5 @@
-import { formatCurrency, type AnnualReport } from "../lib/budget";
+import { useUserSettings } from "../contexts/UserSettingsContext";
+import { type AnnualReport } from "../lib/budget";
 
 interface AnnualFlowBarChartProps {
   report: AnnualReport;
@@ -67,6 +68,7 @@ interface BarProps {
 }
 
 function Bar({ label, value, max, className }: BarProps) {
+  const { formatCurrency } = useUserSettings();
   const width = max <= 0 || value <= 0 ? "0%" : `${Math.max(4, Math.round((value / max) * 100))}%`;
 
   return (

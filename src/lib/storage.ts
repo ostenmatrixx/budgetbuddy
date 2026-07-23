@@ -1,8 +1,6 @@
 import { getSupabaseClient } from "./supabaseClient";
-import {
-  DEFAULT_BUDGET_PREFERENCES,
-  type BudgetPreference
-} from "./budget";
+import { DEFAULT_BUDGET_PREFERENCES, type BudgetPreference } from "./budget";
+import { TRANSACTION_SUBCATEGORY_MAX_LENGTH } from "../types/transaction";
 import type {
   Transaction,
   TransactionDraft,
@@ -10,9 +8,12 @@ import type {
   TransactionSubcategoryOption,
   TransactionType
 } from "../types/transaction";
+import { DEFAULT_USER_SETTINGS, type UserSettings } from "../types/settings";
+import type { DeleteAccountRequest } from "../types/export";
 
 export interface TransactionRow {
   id: string;
+  client_request_id: string;
   user_id: string;
   type: TransactionType;
   subcategory: TransactionSubcategory | null;
@@ -20,11 +21,13 @@ export interface TransactionRow {
   date: string;
   description: string;
   notes: string | null;
+  version: number;
   created_at: string;
   updated_at: string;
 }
 
 export interface TransactionInsertPayload {
+  client_request_id: string;
   user_id: string;
   type: TransactionType;
   subcategory: TransactionSubcategory | null;
@@ -82,15 +85,59 @@ export interface TransactionSubcategoryArchivePayload {
   updated_at: string;
 }
 
+export interface UserSettingsRow {
+  user_id: string;
+  currency_code: string;
+  locale: string;
+  time_zone: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserSettingsPayload {
+  user_id: string;
+  currency_code: string;
+  locale: string;
+  time_zone: string;
+  updated_at: string;
+}
+
 const transactionsTableName = "transactions";
 const budgetPreferencesTableName = "budget_preferences";
 const transactionSubcategoriesTableName = "transaction_subcategories";
+const userSettingsTableName = "user_settings";
 
 export { DEFAULT_BUDGET_PREFERENCES };
+
+export class TransactionConflictError extends Error {
+  readonly code = "TRANSACTION_CONFLICT";
+
+  constructor() {
+    super("This transaction changed on another device. Refresh and try again.");
+    this.name = "TransactionConflictError";
+  }
+}
+
+function assertValidVersion(version: number): void {
+  if (!Number.isSafeInteger(version) || version < 1) {
+    throw new Error("Transaction version must be a positive integer.");
+  }
+}
+
+function yearDateBounds(year: number): { start: string; end: string } {
+  if (!Number.isInteger(year) || year < 1 || year > 9999) {
+    throw new Error("Year must be an integer from 1 through 9999.");
+  }
+
+  const yearText = String(year).padStart(4, "0");
+  return { start: `${yearText}-01-01`, end: `${yearText}-12-31` };
+}
 
 export function rowToTransaction(row: TransactionRow): Transaction {
   return {
     id: row.id,
+    clientRequestId: row.client_request_id,
+    version: Number(row.version),
     type: row.type,
     subcategory: row.subcategory ?? undefined,
     amount: Number(row.amount),
@@ -104,9 +151,11 @@ export function rowToTransaction(row: TransactionRow): Transaction {
 
 export function draftToInsertPayload(
   userId: string,
-  draft: TransactionDraft
+  draft: TransactionDraft,
+  clientRequestId: string
 ): TransactionInsertPayload {
   return {
+    client_request_id: clientRequestId,
     user_id: userId,
     type: draft.type,
     subcategory: draft.subcategory ?? null,
@@ -129,9 +178,7 @@ export function draftToUpdatePayload(draft: TransactionDraft): TransactionUpdate
   };
 }
 
-export function budgetPreferenceRowToPreference(
-  row: BudgetPreferenceRow | null
-): BudgetPreference {
+export function budgetPreferenceRowToPreference(row: BudgetPreferenceRow | null): BudgetPreference {
   if (!row) {
     return DEFAULT_BUDGET_PREFERENCES;
   }
@@ -192,11 +239,56 @@ export function subcategoryArchivePayload(): TransactionSubcategoryArchivePayloa
   };
 }
 
-export async function loadTransactions(userId: string): Promise<Transaction[]> {
+export function userSettingsRowToSettings(row: UserSettingsRow | null): UserSettings {
+  if (!row) {
+    return DEFAULT_USER_SETTINGS;
+  }
+
+  return {
+    currencyCode: row.currency_code,
+    locale: row.locale,
+    timeZone: row.time_zone
+  };
+}
+
+export function userSettingsToPayload(userId: string, settings: UserSettings): UserSettingsPayload {
+  return {
+    user_id: userId,
+    currency_code: settings.currencyCode,
+    locale: settings.locale,
+    time_zone: settings.timeZone,
+    updated_at: new Date().toISOString()
+  };
+}
+
+export async function collectPaginatedRows<T>(
+  fetchPage: (from: number, to: number) => Promise<T[]>,
+  pageSize = 500
+): Promise<T[]> {
+  if (!Number.isInteger(pageSize) || pageSize < 1) {
+    throw new Error("Page size must be a positive integer.");
+  }
+
+  const rows: T[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const page = await fetchPage(from, from + pageSize - 1);
+    rows.push(...page);
+
+    if (page.length < pageSize) {
+      return rows;
+    }
+  }
+}
+
+export async function loadTransactions(userId: string, year: number): Promise<Transaction[]> {
+  const { start, end } = yearDateBounds(year);
   const { data, error } = await getSupabaseClient()
     .from(transactionsTableName)
     .select("*")
     .eq("user_id", userId)
+    .gte("date", start)
+    .lte("date", end)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -209,15 +301,33 @@ export async function loadTransactions(userId: string): Promise<Transaction[]> {
 
 export async function addTransaction(
   userId: string,
-  draft: TransactionDraft
+  draft: TransactionDraft,
+  clientRequestId: string
 ): Promise<Transaction> {
   const { data, error } = await getSupabaseClient()
     .from(transactionsTableName)
-    .insert(draftToInsertPayload(userId, draft))
+    .insert(draftToInsertPayload(userId, draft, clientRequestId))
     .select("*")
     .single();
 
   if (error) {
+    if (error.code === "23505") {
+      const { data: existingData, error: existingError } = await getSupabaseClient()
+        .from(transactionsTableName)
+        .select("*")
+        .eq("user_id", userId)
+        .eq("client_request_id", clientRequestId)
+        .maybeSingle();
+
+      if (existingError) {
+        throw new Error(existingError.message);
+      }
+
+      if (existingData) {
+        return rowToTransaction(existingData as TransactionRow);
+      }
+    }
+
     throw new Error(error.message);
   }
 
@@ -227,13 +337,16 @@ export async function addTransaction(
 export async function updateTransaction(
   userId: string,
   id: string,
-  draft: TransactionDraft
-): Promise<Transaction | undefined> {
+  draft: TransactionDraft,
+  expectedVersion: number
+): Promise<Transaction> {
+  assertValidVersion(expectedVersion);
   const { data, error } = await getSupabaseClient()
     .from(transactionsTableName)
     .update(draftToUpdatePayload(draft))
     .eq("id", id)
     .eq("user_id", userId)
+    .eq("version", expectedVersion)
     .select("*")
     .maybeSingle();
 
@@ -241,20 +354,53 @@ export async function updateTransaction(
     throw new Error(error.message);
   }
 
-  return data ? rowToTransaction(data as TransactionRow) : undefined;
+  if (!data) {
+    throw new TransactionConflictError();
+  }
+
+  return rowToTransaction(data as TransactionRow);
 }
 
-export async function deleteTransaction(id: string): Promise<boolean> {
-  const { error } = await getSupabaseClient()
+export async function deleteTransaction(
+  userId: string,
+  id: string,
+  expectedVersion: number
+): Promise<boolean> {
+  assertValidVersion(expectedVersion);
+  const { data, error } = await getSupabaseClient()
     .from(transactionsTableName)
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId)
+    .eq("version", expectedVersion)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
 
+  if (!data) {
+    throw new TransactionConflictError();
+  }
+
   return true;
+}
+
+export async function getAccountBalance(): Promise<number> {
+  const { data, error } = await getSupabaseClient().rpc("get_account_balance");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const balance = Number(data ?? 0);
+
+  if (!Number.isFinite(balance)) {
+    throw new Error("The account balance returned by the database is invalid.");
+  }
+
+  return balance;
 }
 
 export async function loadBudgetPreference(userId: string): Promise<BudgetPreference> {
@@ -317,6 +463,12 @@ export async function addTransactionSubcategory(
     throw new Error("Add a subcategory name.");
   }
 
+  if (payload.name.length > TRANSACTION_SUBCATEGORY_MAX_LENGTH) {
+    throw new Error(
+      `Use ${TRANSACTION_SUBCATEGORY_MAX_LENGTH} characters or fewer for subcategory names.`
+    );
+  }
+
   const { data, error } = await getSupabaseClient()
     .from(transactionSubcategoriesTableName)
     .insert(payload)
@@ -351,4 +503,100 @@ export async function archiveTransactionSubcategory(
   }
 
   return data ? subcategoryRowToOption(data as TransactionSubcategoryRow) : undefined;
+}
+
+export async function loadUserSettings(userId: string): Promise<UserSettings> {
+  const { data, error } = await getSupabaseClient()
+    .from(userSettingsTableName)
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return userSettingsRowToSettings(data as UserSettingsRow | null);
+}
+
+export async function saveUserSettings(
+  userId: string,
+  settings: UserSettings
+): Promise<UserSettings> {
+  const { data, error } = await getSupabaseClient()
+    .from(userSettingsTableName)
+    .upsert(userSettingsToPayload(userId, settings), { onConflict: "user_id" })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return userSettingsRowToSettings(data as UserSettingsRow);
+}
+
+export async function loadAllTransactions(userId: string): Promise<Transaction[]> {
+  return collectPaginatedRows(async (from, to) => {
+    const { data, error } = await getSupabaseClient()
+      .from(transactionsTableName)
+      .select("*")
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return ((data ?? []) as TransactionRow[]).map(rowToTransaction);
+  });
+}
+
+export async function loadAllTransactionSubcategories(
+  userId: string
+): Promise<TransactionSubcategoryOption[]> {
+  return collectPaginatedRows(async (from, to) => {
+    const { data, error } = await getSupabaseClient()
+      .from(transactionSubcategoriesTableName)
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return ((data ?? []) as TransactionSubcategoryRow[]).map(subcategoryRowToOption);
+  });
+}
+
+export async function deleteOwnAccount(
+  request: DeleteAccountRequest,
+  captchaToken?: string
+): Promise<void> {
+  const { error } = await getSupabaseClient().functions.invoke("delete-account", {
+    body: { ...request, ...(captchaToken ? { captchaToken } : {}) }
+  });
+
+  if (error) {
+    let message = error.message || "Unable to delete your account.";
+    const context = "context" in error ? error.context : undefined;
+
+    if (context instanceof Response) {
+      try {
+        const payload = (await context.clone().json()) as { error?: unknown };
+
+        if (typeof payload.error === "string" && payload.error) {
+          message = payload.error;
+        }
+      } catch {
+        // Keep the provider error when the response is not JSON.
+      }
+    }
+
+    throw new Error(message);
+  }
 }

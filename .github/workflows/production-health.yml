@@ -1,0 +1,34 @@
+name: Production health
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: Optional public URL override (defaults to the PRODUCTION_URL repository variable)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health
+  cancel-in-progress: true
+
+jobs:
+  public-read-only-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DEPLOYMENT_URL: ${{ inputs.target_url || vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Require a public deployment URL
+        run: test -n "$DEPLOYMENT_URL"
+      - name: Verify app shell, PWA, legal, and security endpoints
+        run: node scripts/verify-response-headers.mjs "$DEPLOYMENT_URL"

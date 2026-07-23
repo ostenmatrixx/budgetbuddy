@@ -1,0 +1,56 @@
+name: Staging validation
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-validation
+  cancel-in-progress: false
+
+jobs:
+  database-and-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E2E_USE_STAGING: "1"
+      SUPABASE_STAGING_DB_URL: ${{ secrets.SUPABASE_STAGING_DB_URL }}
+      STAGING_USER_EMAIL: ${{ secrets.STAGING_USER_EMAIL }}
+      STAGING_USER_PASSWORD: ${{ secrets.STAGING_USER_PASSWORD }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_STAGING_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_STAGING_SUPABASE_ANON_KEY }}
+      VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_STAGING_TURNSTILE_SITE_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Require staging secrets
+        run: |
+          test -n "$SUPABASE_STAGING_DB_URL"
+          test -n "$STAGING_USER_EMAIL"
+          test -n "$STAGING_USER_PASSWORD"
+          test -n "$VITE_SUPABASE_URL"
+          test -n "$VITE_SUPABASE_ANON_KEY"
+          test -n "$VITE_TURNSTILE_SITE_KEY"
+      - name: Run owner-scoped pgTAP suite
+        run: npx supabase test db --db-url "$SUPABASE_STAGING_DB_URL" supabase/tests
+      - run: npx playwright install --with-deps chromium
+      - name: Run authenticated staging smoke test
+        run: npm run test:e2e -- e2e/staging-authenticated.spec.ts --project=chromium
+      - name: Upload staging browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: staging-playwright-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
