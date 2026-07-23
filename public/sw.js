@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "budgetbuddy-static-";
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
+const CACHE_NAME = `${CACHE_PREFIX}v3`;
 const LEGACY_CACHE_NAMES = ["budgetbuddy-app-shell-v1"];
 const APP_SHELL = [
   "/",

@@ -2,6 +2,7 @@ import { type FormEvent, useCallback, useState } from "react";
 import { usePwaStatus } from "../hooks/usePwaStatus";
 import { validateAuthInput, type AuthInputErrors, type AuthMode } from "../lib/auth";
 import { getSupabaseClient } from "../lib/supabaseClient";
+import BrandIcon from "./BrandIcon";
 import ThemeToggle, { type ThemeMode } from "./ThemeToggle";
 import Turnstile from "./Turnstile";
 
@@ -182,9 +183,7 @@ export default function LoginScreen({
     <main className="flex min-h-screen flex-col bg-background text-on-background">
       <header className="flex h-14 items-center justify-between border-b border-surface-variant bg-surface px-margin-mobile md:px-margin-desktop">
         <div className="flex items-center gap-2 font-bold text-primary">
-          <span className="material-symbols-outlined" aria-hidden="true">
-            account_balance_wallet
-          </span>
+          <BrandIcon className="h-7 w-7 shrink-0" />
           <span className="text-headline-md">BudgetBuddy</span>
         </div>
         <ThemeToggle compact theme={theme} onToggle={onToggleTheme} />

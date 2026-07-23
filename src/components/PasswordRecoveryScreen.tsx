@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { usePwaStatus } from "../hooks/usePwaStatus";
 import { validateNewPassword, type PasswordInputErrors } from "../lib/auth";
 import { getSupabaseClient } from "../lib/supabaseClient";
+import BrandIcon from "./BrandIcon";
 import ThemeToggle, { type ThemeMode } from "./ThemeToggle";
 
 export interface PasswordRecoveryScreenProps {
@@ -71,7 +72,10 @@ export default function PasswordRecoveryScreen({
   return (
     <main className="flex min-h-screen flex-col bg-background text-on-background">
       <header className="flex h-14 items-center justify-between border-b border-surface-variant bg-surface px-margin-mobile md:px-margin-desktop">
-        <strong className="text-headline-md text-primary">BudgetBuddy</strong>
+        <div className="flex items-center gap-2">
+          <BrandIcon className="h-7 w-7 shrink-0" />
+          <strong className="text-headline-md text-primary">BudgetBuddy</strong>
+        </div>
         <ThemeToggle compact theme={theme} onToggle={onToggleTheme} />
       </header>
       <section className="flex flex-1 items-center justify-center px-gutter py-xl">
