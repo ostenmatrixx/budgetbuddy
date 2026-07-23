@@ -20,6 +20,7 @@ test.use({ serviceWorkers: "block" });
 
 test.beforeEach(async ({ page }) => {
   test.skip(Boolean(process.env.E2E_USE_STAGING), "Mocked tests are for pull-request CI.");
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await installMockSupabase(page, createMockDatabase());
 });
 
@@ -36,10 +37,7 @@ test("preserves sign-in password whitespace and exposes an accessible authentica
 
   expect(database.capturedPassword).toBe("password-with-spaces  ");
 
-  const results = await new AxeBuilder({ page })
-    .disableRules(["color-contrast"])
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
   const seriousViolations = results.violations.filter(
     ({ impact }) => impact === "serious" || impact === "critical"
   );

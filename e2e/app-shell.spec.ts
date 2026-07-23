@@ -1,6 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+});
+
 test("loads the public install landing page without serious accessibility violations", async ({
   page
 }) => {
@@ -11,10 +15,7 @@ test("loads the public install landing page without serious accessibility violat
   ).toBeVisible();
   await expect(page.getByText("The full app opens only from your installed copy.")).toBeVisible();
 
-  const results = await new AxeBuilder({ page })
-    .disableRules(["color-contrast"])
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
 
   expect(results.violations).toEqual([]);
 });
