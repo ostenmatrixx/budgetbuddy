@@ -35,6 +35,7 @@ import {
 import AnnualReportDashboard from "./AnnualReportDashboard";
 import AccessibleDialog from "./AccessibleDialog";
 import AccountSettingsPanel from "./AccountSettingsPanel";
+import BrandIcon from "./BrandIcon";
 import BudgetAllocationCards from "./BudgetAllocationCards";
 import BudgetPreferenceEditor from "./BudgetPreferenceEditor";
 import CalendarWidget from "./CalendarWidget";
@@ -377,12 +378,7 @@ export default function Dashboard({
       </a>
       <aside className="animate-slide-up fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r border-surface-variant bg-surface-container-lowest md:flex">
         <div className="flex shrink-0 items-center gap-3 p-6">
-          <span
-            className="material-symbols-outlined animate-pop text-3xl text-primary"
-            style={{ fontVariationSettings: "'FILL' 1" }}
-          >
-            account_balance_wallet
-          </span>
+          <BrandIcon className="animate-pop h-8 w-8 shrink-0" />
           <span className="text-2xl font-bold text-primary">BudgetBuddy</span>
         </div>
 
@@ -453,9 +449,7 @@ export default function Dashboard({
       <div className="flex min-h-screen flex-col md:pl-64">
         <header className="animate-slide-up sticky top-0 z-30 flex min-h-14 items-center justify-between gap-3 border-b border-surface-variant bg-surface px-4 py-3 md:fixed md:left-64 md:right-0 md:h-14 md:px-6 md:py-0">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="material-symbols-outlined text-primary md:hidden">
-              account_balance_wallet
-            </span>
+            <BrandIcon className="h-6 w-6 shrink-0 md:hidden" />
             <div className="min-w-0">
               <h1 className="truncate text-xl font-bold text-primary md:text-2xl">{activeTitle}</h1>
               <p className="truncate text-xs font-semibold text-outline">{activePeriod}</p>
