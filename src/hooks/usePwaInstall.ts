@@ -44,7 +44,10 @@ function isIosDevice() {
     return false;
   }
 
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
 }
 
 function isDismissed() {
@@ -73,9 +76,12 @@ export function usePwaInstall(): PwaInstallState {
 
   useEffect(() => {
     const handleChange = () => setRevision((current) => current + 1);
+    const standaloneMedia = window.matchMedia("(display-mode: standalone)");
     installPromptListeners.add(handleChange);
+    standaloneMedia.addEventListener?.("change", handleChange);
     return () => {
       installPromptListeners.delete(handleChange);
+      standaloneMedia.removeEventListener?.("change", handleChange);
     };
   }, []);
 

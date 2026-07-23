@@ -1,4 +1,5 @@
 import { expect, test, type Download, type Page } from "@playwright/test";
+import { emulateInstalledPwa } from "./helpers/standalone";
 
 const stagingEmail = process.env.STAGING_USER_EMAIL;
 const stagingPassword = process.env.STAGING_USER_PASSWORD;
@@ -9,6 +10,7 @@ test("staging authenticated CRUD, idempotency, settings, and export smoke", asyn
   const description = `Release smoke ${Date.now()}`;
   let transactionCreated = false;
 
+  await emulateInstalledPwa(page);
   await page.goto("/");
   await page.getByLabel("Email Address").fill(stagingEmail!);
   await page.getByLabel("Password", { exact: true }).fill(stagingPassword!);
