@@ -1577,6 +1577,10 @@ button:disabled {
   background: radial-gradient(circle at center, transparent 40%, var(--chart-glow) 100%);
 }
 
+.pie-slice-divider {
+  filter: drop-shadow(0 0 0.35px rgb(var(--color-on-surface) / 0.7));
+}
+
 .input-well {
   background: var(--input-well-bg);
   border: 1px solid transparent;
