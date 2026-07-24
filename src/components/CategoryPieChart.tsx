@@ -38,6 +38,25 @@ export default function CategoryPieChart({ segments }: CategoryPieChartProps) {
                 strokeWidth="3"
               />
             ))}
+            {ringSegments.length > 1
+              ? ringSegments.map((segment) => {
+                  const boundary = getSliceBoundary(segment.endPercentage);
+
+                  return (
+                    <line
+                      className="pie-slice-divider"
+                      key={`${segment.label}-divider`}
+                      stroke="rgb(var(--color-surface-container-lowest))"
+                      strokeLinecap="round"
+                      strokeWidth="0.65"
+                      x1={boundary.innerX}
+                      x2={boundary.outerX}
+                      y1={boundary.innerY}
+                      y2={boundary.outerY}
+                    />
+                  );
+                })
+              : null}
           </svg>
           <div className="absolute inset-6 flex flex-col items-center justify-center rounded-full bg-surface-container-lowest text-center shadow-[inset_0_0_0_1px_rgba(226,226,228,0.7)]">
             <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-outline">
@@ -100,9 +119,24 @@ function buildRingSegments(segments: CategoryPieSegment[]) {
 
       return {
         color,
+        endPercentage: cursor,
         label: segment.label,
         offset,
         percentage
       };
     });
+}
+
+function getSliceBoundary(percentage: number) {
+  const angle = (percentage / 100) * Math.PI * 2;
+  const center = 18;
+  const innerRadius = 13.8;
+  const outerRadius = 17.2;
+
+  return {
+    innerX: center + innerRadius * Math.cos(angle),
+    innerY: center + innerRadius * Math.sin(angle),
+    outerX: center + outerRadius * Math.cos(angle),
+    outerY: center + outerRadius * Math.sin(angle)
+  };
 }
