@@ -12,6 +12,7 @@ BudgetBuddy is a privacy-conscious personal finance PWA for tracking income, ess
 
 - Tracks income, bills, savings, and non-essential spending with custom subcategories
 - Shows monthly summaries, category charts, a calendar, a daily log, and annual reports
+- Adds all-history activity search, monthly decision support, confirmed recurring items, and linked savings goals
 - Supports editable budget allocations, with 50/30/20 defaults
 - Formats dates and money from each account's currency, locale, and timezone settings
 - Handles confirmation, recovery, password changes, and password-reauthenticated account deletion
@@ -117,7 +118,10 @@ Use separate Supabase projects and Vercel variables for Preview and Production. 
 
 ## Scope
 
-Receipt scanning, recurring transactions, CSV import, bank synchronization, alerts, persistent offline financial storage, and background mutation queues are intentionally deferred until the production-beta foundation has been deployed and observed under real use.
+Receipt scanning, CSV import, bank synchronization, device push notifications, automatic recurring
+transaction creation, persistent offline financial storage, and background mutation queues are
+intentionally deferred until the production-beta foundation has been deployed and observed under
+real use.
 
 Contributions are welcome through the process in [CONTRIBUTING.md](CONTRIBUTING.md).
 

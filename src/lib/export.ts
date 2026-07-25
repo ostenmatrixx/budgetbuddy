@@ -1,36 +1,53 @@
 import {
   loadAllTransactions,
   loadAllTransactionSubcategories,
+  loadAllRecurringOccurrenceActions,
   loadBudgetPreference,
+  loadRecurringItems,
+  loadSavingsGoals,
   loadUserSettings
 } from "./storage";
-import type { BudgetBuddyExportV1, ExportFormat } from "../types/export";
+import type { BudgetBuddyExport, BudgetBuddyExportV2, ExportFormat } from "../types/export";
 import type { Transaction } from "../types/transaction";
 
 export async function buildBudgetBuddyExport(
   userId: string,
   email: string,
   now: Date = new Date()
-): Promise<BudgetBuddyExportV1> {
-  const [settings, budgetPreference, transactionSubcategories, transactions] = await Promise.all([
+): Promise<BudgetBuddyExportV2> {
+  const [
+    settings,
+    budgetPreference,
+    transactionSubcategories,
+    transactions,
+    recurringItems,
+    recurringOccurrenceActions,
+    savingsGoals
+  ] = await Promise.all([
     loadUserSettings(userId),
     loadBudgetPreference(userId),
     loadAllTransactionSubcategories(userId),
-    loadAllTransactions(userId)
+    loadAllTransactions(userId),
+    loadRecurringItems(userId),
+    loadAllRecurringOccurrenceActions(userId),
+    loadSavingsGoals(userId)
   ]);
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     exportedAt: now.toISOString(),
     account: { id: userId, email },
     settings,
     budgetPreference,
     transactionSubcategories,
-    transactions
+    transactions,
+    recurringItems,
+    recurringOccurrenceActions,
+    savingsGoals
   };
 }
 
-export function serializeBudgetBuddyExport(data: BudgetBuddyExportV1): string {
+export function serializeBudgetBuddyExport(data: BudgetBuddyExport): string {
   return `${JSON.stringify(data, null, 2)}\n`;
 }
 

@@ -5,7 +5,7 @@ import {
   serializeBudgetBuddyExport,
   transactionsToCsv
 } from "./export";
-import type { BudgetBuddyExportV1 } from "../types/export";
+import type { BudgetBuddyExportV1, BudgetBuddyExportV2 } from "../types/export";
 import type { Transaction } from "../types/transaction";
 
 const transaction: Transaction = {
@@ -41,6 +41,31 @@ describe("BudgetBuddy export serialization", () => {
     expect(JSON.parse(serializeBudgetBuddyExport(data))).toMatchObject({
       schemaVersion: 1,
       account: { email: "owner@example.com" }
+    });
+  });
+
+  it("serializes decision-support records in version two", () => {
+    const data: BudgetBuddyExportV2 = {
+      schemaVersion: 2,
+      exportedAt: "2026-07-25T00:00:00.000Z",
+      account: { id: "user-id", email: "owner@example.com" },
+      settings: { currencyCode: "PHP", locale: "en-PH", timeZone: "Asia/Manila" },
+      budgetPreference: {
+        essentialsPercent: 50,
+        savingsPercent: 30,
+        nonEssentialsPercent: 20
+      },
+      transactionSubcategories: [],
+      transactions: [transaction],
+      recurringItems: [],
+      recurringOccurrenceActions: [],
+      savingsGoals: []
+    };
+
+    expect(JSON.parse(serializeBudgetBuddyExport(data))).toMatchObject({
+      schemaVersion: 2,
+      recurringItems: [],
+      savingsGoals: []
     });
   });
 

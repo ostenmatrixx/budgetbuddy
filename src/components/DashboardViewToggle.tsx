@@ -1,4 +1,4 @@
-export type DashboardView = "monthly" | "annual";
+export type DashboardView = "home" | "activity" | "reports";
 
 interface DashboardViewToggleProps {
   compact?: boolean;
@@ -7,8 +7,9 @@ interface DashboardViewToggleProps {
 }
 
 const views: Array<{ id: DashboardView; icon: string; label: string; shortLabel: string }> = [
-  { id: "monthly", icon: "dashboard", label: "Monthly Dashboard", shortLabel: "Monthly" },
-  { id: "annual", icon: "bar_chart", label: "Annual Report", shortLabel: "Annual" }
+  { id: "home", icon: "dashboard", label: "Monthly Dashboard", shortLabel: "Home" },
+  { id: "activity", icon: "receipt_long", label: "Activity", shortLabel: "Activity" },
+  { id: "reports", icon: "bar_chart", label: "Annual Report", shortLabel: "Reports" }
 ];
 
 export default function DashboardViewToggle({
@@ -18,7 +19,7 @@ export default function DashboardViewToggle({
 }: DashboardViewToggleProps) {
   return (
     <div
-      className={compact ? "grid grid-cols-2 gap-1" : "flex flex-col gap-1"}
+      className={compact ? "grid grid-cols-3 gap-1" : "flex flex-col gap-1"}
       aria-label="Dashboard view"
     >
       {views.map((item) => {
@@ -39,6 +40,7 @@ export default function DashboardViewToggle({
             onClick={() => onChange(item.id)}
           >
             <span
+              aria-hidden="true"
               className="material-symbols-outlined text-[22px]"
               style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}
             >

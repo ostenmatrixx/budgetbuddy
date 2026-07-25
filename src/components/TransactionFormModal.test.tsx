@@ -56,6 +56,35 @@ describe("TransactionFormModal", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Network unavailable.");
   });
+
+  it("applies a recent transaction shortcut as an editable prefill", async () => {
+    const user = userEvent.setup();
+    render(
+      <TransactionFormModal
+        recentPrefills={[
+          {
+            label: "Internet bill",
+            draft: {
+              type: "bills",
+              amount: 500,
+              date: "2026-07-25",
+              description: "Internet bill",
+              notes: ""
+            }
+          }
+        ]}
+        subcategoriesByType={{}}
+        onClose={vi.fn()}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Internet bill" }));
+
+    expect(screen.getByLabelText("Transaction amount")).toHaveValue(500);
+    expect(screen.getByLabelText("Description")).toHaveValue("Internet bill");
+    expect(screen.getByLabelText("Date")).toHaveValue("2026-07-25");
+  });
 });
 
 async function completeRequiredFieldsAfterRender(onSubmit: () => Promise<void>) {

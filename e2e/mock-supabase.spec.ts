@@ -59,15 +59,19 @@ test("guards duplicate transaction submission and uses an accessible delete conf
   await page.getByLabel("Description").fill("Mock grocery run");
   await page.getByRole("button", { name: "Save entry" }).dblclick();
 
-  await expect(page.getByText("Mock grocery run")).toBeVisible();
+  await expect(
+    page.locator("article:visible").filter({ hasText: "Mock grocery run" }).first()
+  ).toBeVisible();
   expect(database.transactionWrites).toBe(1);
   expect(database.transactions).toHaveLength(1);
 
-  let transaction = page.locator("article").filter({ hasText: "Mock grocery run" }).first();
+  let transaction = page.locator("article:visible").filter({ hasText: "Mock grocery run" }).first();
   await transaction.getByRole("button", { name: "Edit transaction" }).click();
   await page.getByLabel("Description").fill("Updated grocery run");
   await page.getByRole("button", { name: "Save entry" }).click();
-  await expect(page.getByText("Updated grocery run")).toBeVisible();
+  await expect(
+    page.locator("article:visible").filter({ hasText: "Updated grocery run" }).first()
+  ).toBeVisible();
   await expect(page.getByText("Mock grocery run")).toHaveCount(0);
   expect(database.transactionUpdates).toBe(1);
   expect(database.transactions[0]).toMatchObject({
@@ -75,7 +79,7 @@ test("guards duplicate transaction submission and uses an accessible delete conf
     version: 2
   });
 
-  transaction = page.locator("article").filter({ hasText: "Updated grocery run" }).first();
+  transaction = page.locator("article:visible").filter({ hasText: "Updated grocery run" }).first();
   await transaction.getByRole("button", { name: "Delete transaction" }).click();
   const confirmation = page.getByRole("dialog", { name: "Delete transaction?" });
   await expect(confirmation).toHaveAccessibleDescription(/Updated grocery run/);
@@ -131,9 +135,12 @@ test("saves regional settings, downloads a fresh export, and disables writes off
   expect(download.suggestedFilename()).toMatch(/^budgetbuddy-export-\d{4}-\d{2}-\d{2}\.json$/);
   const exportData = JSON.parse(await readDownload(download)) as Record<string, unknown>;
   expect(exportData).toMatchObject({
-    schemaVersion: 1,
+    schemaVersion: 2,
     account: { id: mockUser.id, email: mockUser.email },
-    settings: { currencyCode: "USD", locale: "en-US", timeZone: "Asia/Manila" }
+    settings: { currencyCode: "USD", locale: "en-US", timeZone: "Asia/Manila" },
+    recurringItems: [],
+    recurringOccurrenceActions: [],
+    savingsGoals: []
   });
 
   await context.setOffline(true);
@@ -141,6 +148,60 @@ test("saves regional settings, downloads a fresh export, and disables writes off
   await expect(page.getByRole("button", { name: "Save preferences" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Download JSON" })).toBeDisabled();
   await context.setOffline(false);
+});
+
+test("uses bottom navigation on mobile and opens the central add action", async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 932 });
+  await signIn(page);
+
+  const primaryNavigation = page.getByRole("navigation", { name: "Primary" });
+  await expect(primaryNavigation).toBeVisible();
+
+  await primaryNavigation.getByRole("button", { name: "Activity" }).click();
+  await expect(page.getByRole("heading", { name: "Activity", level: 2 })).toBeVisible();
+
+  await primaryNavigation.getByRole("button", { name: "Reports" }).click();
+  await expect(page.getByRole("heading", { name: "Annual Report", level: 2 })).toBeVisible();
+
+  await primaryNavigation.getByRole("button", { name: "Home" }).click();
+  await expect(page.getByRole("heading", { name: "This Month" })).toBeVisible();
+
+  await primaryNavigation.getByRole("button", { name: "Add transaction" }).click();
+  await expect(page.getByRole("dialog", { name: "Transaction details" })).toBeVisible();
+});
+
+test("searches all-history activity and prefills a repeated transaction", async ({ page }) => {
+  const database = createMockDatabase();
+  const now = new Date().toISOString();
+  database.transactions = [
+    {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      client_request_id: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+      user_id: mockUser.id,
+      type: "bills",
+      subcategory: null,
+      amount: 500,
+      date: "2026-07-20",
+      description: "Internet bill",
+      notes: "",
+      version: 1,
+      created_at: now,
+      updated_at: now
+    }
+  ];
+  await page.unroute("https://mock.supabase.co/**");
+  await installMockSupabase(page, database);
+  await signIn(page);
+
+  await page.getByRole("button", { name: "Activity", exact: true }).first().click();
+  await page.getByLabel("Search activity").fill("Internet");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByText("Internet bill", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Repeat Internet bill" }).click();
+  const dialog = page.getByRole("dialog", { name: "Transaction details" });
+  await expect(dialog.getByLabel("Transaction amount")).toHaveValue("500");
+  await expect(dialog.getByLabel("Description")).toHaveValue("Internet bill");
 });
 
 function createMockDatabase(): MockDatabase {
@@ -269,6 +330,22 @@ async function installMockSupabase(page: Page, database: MockDatabase) {
       return;
     }
 
+    if (url.pathname === "/rest/v1/rpc/get_savings_goal_progress") {
+      await fulfillJson(route, []);
+      return;
+    }
+
+    if (url.pathname === "/rest/v1/rpc/search_transactions") {
+      await fulfillJson(
+        route,
+        database.transactions.map((transaction) => ({
+          ...transaction,
+          total_count: database.transactions.length
+        }))
+      );
+      return;
+    }
+
     if (url.pathname === "/rest/v1/budget_preferences") {
       await fulfillJson(route, {
         user_id: mockUser.id,
@@ -282,6 +359,15 @@ async function installMockSupabase(page: Page, database: MockDatabase) {
     }
 
     if (url.pathname === "/rest/v1/transaction_subcategories") {
+      await fulfillJson(route, []);
+      return;
+    }
+
+    if (
+      url.pathname === "/rest/v1/recurring_items" ||
+      url.pathname === "/rest/v1/recurring_occurrence_actions" ||
+      url.pathname === "/rest/v1/savings_goals"
+    ) {
       await fulfillJson(route, []);
       return;
     }

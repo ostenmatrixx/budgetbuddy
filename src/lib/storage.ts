@@ -10,6 +10,16 @@ import type {
 } from "../types/transaction";
 import { DEFAULT_USER_SETTINGS, type UserSettings } from "../types/settings";
 import type { DeleteAccountRequest } from "../types/export";
+import type {
+  ActivityFilters,
+  ActivityPage,
+  RecurringItem,
+  RecurringItemDraft,
+  RecurringOccurrenceAction,
+  RecurringFrequency,
+  SavingsGoal,
+  SavingsGoalDraft
+} from "../types/decisionSupport";
 
 export interface TransactionRow {
   id: string;
@@ -102,10 +112,56 @@ export interface UserSettingsPayload {
   updated_at: string;
 }
 
+export interface RecurringItemRow {
+  id: string;
+  user_id: string;
+  type: TransactionType;
+  subcategory_id: string | null;
+  amount: number | string;
+  description: string;
+  notes: string;
+  frequency: RecurringFrequency;
+  start_date: string;
+  occurrence_number: number;
+  next_due_date: string;
+  end_date: string | null;
+  is_active: boolean;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecurringOccurrenceActionRow {
+  id: string;
+  user_id: string;
+  recurring_item_id: string;
+  due_date: string;
+  action: "recorded" | "skipped";
+  transaction_id: string | null;
+  created_at: string;
+}
+
+export interface SavingsGoalRow {
+  id: string;
+  user_id: string;
+  name: string;
+  subcategory_id: string;
+  target_amount: number | string;
+  tracking_start_date: string;
+  target_date: string | null;
+  is_active: boolean;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const transactionsTableName = "transactions";
 const budgetPreferencesTableName = "budget_preferences";
 const transactionSubcategoriesTableName = "transaction_subcategories";
 const userSettingsTableName = "user_settings";
+const recurringItemsTableName = "recurring_items";
+const recurringOccurrenceActionsTableName = "recurring_occurrence_actions";
+const savingsGoalsTableName = "savings_goals";
 
 export { DEFAULT_BUDGET_PREFERENCES };
 
@@ -115,6 +171,15 @@ export class TransactionConflictError extends Error {
   constructor() {
     super("This transaction changed on another device. Refresh and try again.");
     this.name = "TransactionConflictError";
+  }
+}
+
+export class DecisionSupportConflictError extends Error {
+  readonly code = "DECISION_SUPPORT_CONFLICT";
+
+  constructor(message = "This item changed on another device. Refresh and try again.") {
+    super(message);
+    this.name = "DecisionSupportConflictError";
   }
 }
 
@@ -258,6 +323,54 @@ export function userSettingsToPayload(userId: string, settings: UserSettings): U
     locale: settings.locale,
     time_zone: settings.timeZone,
     updated_at: new Date().toISOString()
+  };
+}
+
+export function recurringItemRowToItem(row: RecurringItemRow): RecurringItem {
+  return {
+    id: row.id,
+    type: row.type,
+    subcategoryId: row.subcategory_id ?? undefined,
+    amount: Number(row.amount),
+    description: row.description,
+    notes: row.notes,
+    frequency: row.frequency,
+    startDate: row.start_date,
+    occurrenceNumber: Number(row.occurrence_number),
+    nextDueDate: row.next_due_date,
+    endDate: row.end_date ?? undefined,
+    isActive: row.is_active,
+    version: Number(row.version),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export function recurringOccurrenceActionRowToAction(
+  row: RecurringOccurrenceActionRow
+): RecurringOccurrenceAction {
+  return {
+    id: row.id,
+    recurringItemId: row.recurring_item_id,
+    dueDate: row.due_date,
+    action: row.action,
+    transactionId: row.transaction_id ?? undefined,
+    createdAt: row.created_at
+  };
+}
+
+export function savingsGoalRowToGoal(row: SavingsGoalRow): SavingsGoal {
+  return {
+    id: row.id,
+    name: row.name,
+    subcategoryId: row.subcategory_id,
+    targetAmount: Number(row.target_amount),
+    trackingStartDate: row.tracking_start_date,
+    targetDate: row.target_date ?? undefined,
+    isActive: row.is_active,
+    version: Number(row.version),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
@@ -573,6 +686,349 @@ export async function loadAllTransactionSubcategories(
   });
 }
 
+export async function loadActivityPage(
+  filters: ActivityFilters,
+  page: number,
+  pageSize = 25
+): Promise<ActivityPage> {
+  const normalizedPage = Number.isInteger(page) && page > 0 ? page : 1;
+  const normalizedPageSize = Math.min(100, Math.max(1, Math.trunc(pageSize)));
+  const minimumAmount = normalizeOptionalAmount(filters.minimumAmount, "Minimum amount");
+  const maximumAmount = normalizeOptionalAmount(filters.maximumAmount, "Maximum amount");
+
+  if (minimumAmount !== undefined && maximumAmount !== undefined && minimumAmount > maximumAmount) {
+    throw new Error("Minimum amount cannot be greater than maximum amount.");
+  }
+
+  const { data, error } = await getSupabaseClient().rpc("search_transactions", {
+    search_text: filters.search.trim(),
+    filter_types: filters.types.length > 0 ? filters.types : null,
+    date_from: filters.dateFrom || null,
+    date_to: filters.dateTo || null,
+    minimum_amount: minimumAmount ?? null,
+    maximum_amount: maximumAmount ?? null,
+    sort_direction: filters.sort,
+    page_offset: (normalizedPage - 1) * normalizedPageSize,
+    page_limit: normalizedPageSize
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []) as Array<TransactionRow & { total_count: number | string }>;
+  const totalItems = rows.length > 0 ? Number(rows[0].total_count) : 0;
+
+  return {
+    items: rows.map(rowToTransaction),
+    page: normalizedPage,
+    pageSize: normalizedPageSize,
+    totalItems,
+    totalPages: Math.max(1, Math.ceil(totalItems / normalizedPageSize))
+  };
+}
+
+export async function loadRecurringItems(userId: string): Promise<RecurringItem[]> {
+  const { data, error } = await getSupabaseClient()
+    .from(recurringItemsTableName)
+    .select("*")
+    .eq("user_id", userId)
+    .order("is_active", { ascending: false })
+    .order("next_due_date", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as RecurringItemRow[]).map(recurringItemRowToItem);
+}
+
+export async function addRecurringItem(
+  userId: string,
+  draft: RecurringItemDraft
+): Promise<RecurringItem> {
+  const { data, error } = await getSupabaseClient()
+    .from(recurringItemsTableName)
+    .insert({
+      user_id: userId,
+      type: draft.type,
+      subcategory_id: draft.subcategoryId ?? null,
+      amount: draft.amount,
+      description: draft.description.trim(),
+      notes: draft.notes,
+      frequency: draft.frequency,
+      start_date: draft.startDate,
+      next_due_date: draft.startDate,
+      end_date: draft.endDate ?? null
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return recurringItemRowToItem(data as RecurringItemRow);
+}
+
+export async function updateRecurringItem(
+  userId: string,
+  item: RecurringItem,
+  draft: RecurringItemDraft
+): Promise<RecurringItem> {
+  assertValidVersion(item.version);
+  const scheduleChanged = item.startDate !== draft.startDate || item.frequency !== draft.frequency;
+  const payload = {
+    type: draft.type,
+    subcategory_id: draft.subcategoryId ?? null,
+    amount: draft.amount,
+    description: draft.description.trim(),
+    notes: draft.notes,
+    frequency: draft.frequency,
+    start_date: draft.startDate,
+    end_date: draft.endDate ?? null,
+    ...(scheduleChanged
+      ? {
+          occurrence_number: 0,
+          next_due_date: draft.startDate
+        }
+      : {}),
+    version: item.version + 1,
+    updated_at: new Date().toISOString()
+  };
+  const { data, error } = await getSupabaseClient()
+    .from(recurringItemsTableName)
+    .update(payload)
+    .eq("id", item.id)
+    .eq("user_id", userId)
+    .eq("version", item.version)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) {
+    throw new DecisionSupportConflictError();
+  }
+
+  return recurringItemRowToItem(data as RecurringItemRow);
+}
+
+export async function setRecurringItemActive(
+  userId: string,
+  item: RecurringItem,
+  isActive: boolean
+): Promise<RecurringItem> {
+  const { data, error } = await getSupabaseClient()
+    .from(recurringItemsTableName)
+    .update({
+      is_active: isActive,
+      version: item.version + 1,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", item.id)
+    .eq("user_id", userId)
+    .eq("version", item.version)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) {
+    throw new DecisionSupportConflictError();
+  }
+
+  return recurringItemRowToItem(data as RecurringItemRow);
+}
+
+export async function recordRecurringOccurrence(
+  item: RecurringItem,
+  draft: TransactionDraft,
+  clientRequestId: string
+): Promise<Transaction> {
+  const { data, error } = await getSupabaseClient().rpc("record_recurring_occurrence", {
+    recurring_id: item.id,
+    expected_due_date: item.nextDueDate,
+    request_id: clientRequestId,
+    transaction_type: draft.type,
+    transaction_subcategory: draft.subcategory ?? "",
+    transaction_amount: draft.amount,
+    transaction_date: draft.date,
+    transaction_description: draft.description,
+    transaction_notes: draft.notes
+  });
+
+  if (error) {
+    throw new DecisionSupportConflictError(error.message);
+  }
+
+  const row = data?.[0];
+  if (!row) {
+    throw new Error("The recurring transaction was not created.");
+  }
+
+  return rowToTransaction(row as TransactionRow);
+}
+
+export async function skipRecurringOccurrence(item: RecurringItem): Promise<RecurringItem> {
+  const { data, error } = await getSupabaseClient().rpc("skip_recurring_occurrence", {
+    recurring_id: item.id,
+    expected_due_date: item.nextDueDate
+  });
+
+  if (error) {
+    throw new DecisionSupportConflictError(error.message);
+  }
+
+  const row = data?.[0];
+  if (!row) {
+    throw new Error("The recurring occurrence was not skipped.");
+  }
+
+  return recurringItemRowToItem(row as RecurringItemRow);
+}
+
+export async function loadAllRecurringOccurrenceActions(
+  userId: string
+): Promise<RecurringOccurrenceAction[]> {
+  return collectPaginatedRows(async (from, to) => {
+    const { data, error } = await getSupabaseClient()
+      .from(recurringOccurrenceActionsTableName)
+      .select("*")
+      .eq("user_id", userId)
+      .order("due_date", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return ((data ?? []) as RecurringOccurrenceActionRow[]).map(
+      recurringOccurrenceActionRowToAction
+    );
+  });
+}
+
+export async function loadSavingsGoals(userId: string): Promise<SavingsGoal[]> {
+  const { data, error } = await getSupabaseClient()
+    .from(savingsGoalsTableName)
+    .select("*")
+    .eq("user_id", userId)
+    .order("is_active", { ascending: false })
+    .order("target_date", { ascending: true, nullsFirst: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as SavingsGoalRow[]).map(savingsGoalRowToGoal);
+}
+
+export async function addSavingsGoal(
+  userId: string,
+  draft: SavingsGoalDraft
+): Promise<SavingsGoal> {
+  const { data, error } = await getSupabaseClient()
+    .from(savingsGoalsTableName)
+    .insert({
+      user_id: userId,
+      name: draft.name.trim(),
+      subcategory_id: draft.subcategoryId,
+      target_amount: draft.targetAmount,
+      tracking_start_date: draft.trackingStartDate,
+      target_date: draft.targetDate ?? null
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("That savings subcategory already has an active goal.");
+    }
+    throw new Error(error.message);
+  }
+
+  return savingsGoalRowToGoal(data as SavingsGoalRow);
+}
+
+export async function updateSavingsGoal(
+  userId: string,
+  goal: SavingsGoal,
+  draft: SavingsGoalDraft
+): Promise<SavingsGoal> {
+  const { data, error } = await getSupabaseClient()
+    .from(savingsGoalsTableName)
+    .update({
+      name: draft.name.trim(),
+      subcategory_id: draft.subcategoryId,
+      target_amount: draft.targetAmount,
+      tracking_start_date: draft.trackingStartDate,
+      target_date: draft.targetDate ?? null,
+      version: goal.version + 1,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", goal.id)
+    .eq("user_id", userId)
+    .eq("version", goal.version)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("That savings subcategory already has an active goal.");
+    }
+    throw new Error(error.message);
+  }
+  if (!data) {
+    throw new DecisionSupportConflictError();
+  }
+
+  return savingsGoalRowToGoal(data as SavingsGoalRow);
+}
+
+export async function setSavingsGoalActive(
+  userId: string,
+  goal: SavingsGoal,
+  isActive: boolean
+): Promise<SavingsGoal> {
+  const { data, error } = await getSupabaseClient()
+    .from(savingsGoalsTableName)
+    .update({
+      is_active: isActive,
+      version: goal.version + 1,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", goal.id)
+    .eq("user_id", userId)
+    .eq("version", goal.version)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("That savings subcategory already has an active goal.");
+    }
+    throw new Error(error.message);
+  }
+  if (!data) {
+    throw new DecisionSupportConflictError();
+  }
+
+  return savingsGoalRowToGoal(data as SavingsGoalRow);
+}
+
+export async function loadSavingsGoalProgress(): Promise<Map<string, number>> {
+  const { data, error } = await getSupabaseClient().rpc("get_savings_goal_progress");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return new Map((data ?? []).map((row) => [row.goal_id, Number(row.saved_amount)]));
+}
+
 export async function deleteOwnAccount(
   request: DeleteAccountRequest,
   captchaToken?: string
@@ -599,4 +1055,17 @@ export async function deleteOwnAccount(
 
     throw new Error(message);
   }
+}
+
+function normalizeOptionalAmount(value: string, label: string): number | undefined {
+  if (!value.trim()) {
+    return undefined;
+  }
+
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error(`${label} must be zero or greater.`);
+  }
+
+  return amount;
 }
