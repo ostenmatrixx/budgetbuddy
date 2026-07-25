@@ -1549,6 +1549,12 @@ button:disabled {
   justify-content: center;
 }
 
+.material-symbols-outlined:not(.grid):not(.inline-flex):not(.flex) {
+  inline-size: 1em;
+  max-inline-size: 1em;
+  overflow: hidden;
+}
+
 .custom-scrollbar {
   scrollbar-color: rgb(var(--color-surface-container-highest)) transparent;
   scrollbar-width: thin;
