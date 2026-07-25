@@ -1,12 +1,37 @@
 # BudgetBuddy
 
-[![CI](https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/ci.yml/badge.svg)](https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/codeql.yml/badge.svg)](https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/codeql.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <strong>See the month clearly. Spend with intention.</strong><br />
+  A privacy-conscious personal finance PWA for calm, contextual money decisions.
+</p>
 
-BudgetBuddy is a privacy-conscious personal finance PWA for tracking income, essentials, savings, and discretionary spending. It combines a responsive React dashboard with Supabase authentication and owner-scoped Postgres data, and is engineered for a public multi-user beta on Vercel.
+<p align="center">
+  <a href="https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/codeql.yml"><img alt="CodeQL status" src="https://github.com/ostenmatrixx/budgetbuddy/actions/workflows/codeql.yml/badge.svg" /></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-d4b900.svg" /></a>
+</p>
 
-![BudgetBuddy monthly dashboard](portfolio-screenshots/01-monthly-dashboard-desktop.png)
+<p align="center">
+  <a href="#tech-stack"><img alt="React 19" src="https://img.shields.io/badge/React-19-149ECA?logo=react&amp;logoColor=white" /></a>
+  <a href="#tech-stack"><img alt="TypeScript 5.9" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&amp;logoColor=white" /></a>
+  <a href="#tech-stack"><img alt="Vite 7" src="https://img.shields.io/badge/Vite-7-646CFF?logo=vite&amp;logoColor=white" /></a>
+  <a href="#tech-stack"><img alt="Tailwind CSS 3" src="https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&amp;logoColor=white" /></a>
+  <a href="#tech-stack"><img alt="Supabase Postgres" src="https://img.shields.io/badge/Supabase-Postgres-3FCF8E?logo=supabase&amp;logoColor=white" /></a>
+  <a href="#what-it-does"><img alt="Installable PWA" src="https://img.shields.io/badge/PWA-installable-5A0FC8?logo=pwa&amp;logoColor=white" /></a>
+  <a href="#local-development"><img alt="Node.js 24" src="https://img.shields.io/badge/Node.js-24-339933?logo=nodedotjs&amp;logoColor=white" /></a>
+  <a href="#quality-gates"><img alt="Vitest tests" src="https://img.shields.io/badge/Tests-Vitest-6E9F18?logo=vitest&amp;logoColor=white" /></a>
+  <a href="#quality-gates"><img alt="Playwright browser tests" src="https://img.shields.io/badge/E2E-Playwright-2EAD33?logo=playwright&amp;logoColor=white" /></a>
+</p>
+
+## Showcase
+
+<p align="center">
+  <a href="portfolio-screenshots/00-budgetbuddy-showcase.png">
+    <img src="portfolio-screenshots/00-budgetbuddy-showcase.png" alt="BudgetBuddy editorial showcase with the monthly dashboard, balance, budget allocation, and recent activity" />
+  </a>
+</p>
+
+BudgetBuddy brings income, essentials, savings, and everyday spending into one calm place. It combines a responsive React dashboard with Supabase authentication and owner-scoped Postgres data, and is engineered for a public multi-user beta on Vercel.
 
 ## What it does
 
