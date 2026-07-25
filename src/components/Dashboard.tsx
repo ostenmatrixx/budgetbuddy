@@ -394,7 +394,7 @@ export default function Dashboard({
       }
 
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   }
 
@@ -457,7 +457,7 @@ export default function Dashboard({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save budget targets.";
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     } finally {
       setIsSavingBudgetPreference(false);
     }
@@ -476,7 +476,7 @@ export default function Dashboard({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to add subcategory.";
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   }
 
@@ -504,7 +504,7 @@ export default function Dashboard({
       const message =
         error instanceof Error ? error.message : "Unable to archive this subcategory.";
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   }
 
@@ -525,7 +525,7 @@ export default function Dashboard({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save recurring item.";
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   }
 
@@ -576,7 +576,7 @@ export default function Dashboard({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save savings goal.";
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   }
 
