@@ -44,11 +44,13 @@ interface TransactionSectionProps {
   year: number;
   month: number;
   motionIndex?: number;
+  mobileCompact?: boolean;
   onAdd: () => void;
   onAddSubcategory: (type: TransactionType, name: string) => Promise<void>;
   onArchiveSubcategory: (subcategory: TransactionSubcategoryOption) => Promise<void>;
   onDelete: (transaction: Transaction) => void;
   onEdit: (transaction: Transaction) => void;
+  onSeeAll?: () => void;
 }
 
 export default function TransactionSection({
@@ -60,11 +62,13 @@ export default function TransactionSection({
   year,
   month,
   motionIndex = 0,
+  mobileCompact = false,
   onAdd,
   onAddSubcategory,
   onArchiveSubcategory,
   onDelete,
-  onEdit
+  onEdit,
+  onSeeAll
 }: TransactionSectionProps) {
   const { formatCurrency } = useUserSettings();
   const [isManagingSubcategories, setIsManagingSubcategories] = useState(false);
@@ -139,7 +143,9 @@ export default function TransactionSection({
         </div>
 
         <div className="p-5 pt-0">
-          <CategoryPieChart segments={pieSegments} />
+          <div className={mobileCompact ? "hidden lg:block" : undefined}>
+            <CategoryPieChart segments={pieSegments} />
+          </div>
 
           {subcategoryGroups.length > 1 ? (
             <SubcategoryNav
@@ -152,29 +158,42 @@ export default function TransactionSection({
 
           <div className="mt-5 grid gap-3">
             {selectedSubcategoryGroup ? (
-              <SubcategoryCard
-                labelledBy={
-                  subcategoryGroups.length > 1
-                    ? getSubcategoryTabId(
-                        subcategoryTabsId,
-                        subcategoryGroups.indexOf(selectedSubcategoryGroup)
-                      )
-                    : undefined
-                }
-                panelId={
-                  subcategoryGroups.length > 1
-                    ? getSubcategoryPanelId(
-                        subcategoryTabsId,
-                        subcategoryGroups.indexOf(selectedSubcategoryGroup)
-                      )
-                    : undefined
-                }
-                group={selectedSubcategoryGroup}
-                isWriteDisabled={isWriteDisabled}
-                key={selectedSubcategoryGroup.label}
-                onDelete={onDelete}
-                onEdit={onEdit}
-              />
+              <>
+                {mobileCompact ? (
+                  <CompactTransactionList
+                    group={selectedSubcategoryGroup}
+                    isWriteDisabled={isWriteDisabled}
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                    onSeeAll={onSeeAll}
+                  />
+                ) : null}
+                <div className={mobileCompact ? "hidden lg:block" : undefined}>
+                  <SubcategoryCard
+                    labelledBy={
+                      subcategoryGroups.length > 1
+                        ? getSubcategoryTabId(
+                            subcategoryTabsId,
+                            subcategoryGroups.indexOf(selectedSubcategoryGroup)
+                          )
+                        : undefined
+                    }
+                    panelId={
+                      subcategoryGroups.length > 1
+                        ? getSubcategoryPanelId(
+                            subcategoryTabsId,
+                            subcategoryGroups.indexOf(selectedSubcategoryGroup)
+                          )
+                        : undefined
+                    }
+                    group={selectedSubcategoryGroup}
+                    isWriteDisabled={isWriteDisabled}
+                    key={selectedSubcategoryGroup.label}
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                  />
+                </div>
+              </>
             ) : null}
           </div>
         </div>
@@ -545,6 +564,57 @@ function SubcategoryManagerModal({
         }}
       />
     </>
+  );
+}
+
+function CompactTransactionList({
+  group,
+  isWriteDisabled,
+  onDelete,
+  onEdit,
+  onSeeAll
+}: {
+  group: SubcategoryGroup;
+  isWriteDisabled: boolean;
+  onDelete: (transaction: Transaction) => void;
+  onEdit: (transaction: Transaction) => void;
+  onSeeAll?: () => void;
+}) {
+  const transactions = sortTransactionsForDisplay(group.transactions, "newest").slice(0, 3);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest lg:hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-surface-variant p-3">
+        <div>
+          <h3 className="font-bold text-on-surface">{group.label}</h3>
+          <p className="text-xs font-semibold text-outline">Latest three entries</p>
+        </div>
+        {onSeeAll ? (
+          <button
+            className="motion-button rounded-lg px-3 py-2 text-xs font-bold text-primary hover:bg-surface-container-low"
+            type="button"
+            onClick={onSeeAll}
+          >
+            See all
+          </button>
+        ) : null}
+      </div>
+      {transactions.length === 0 ? (
+        <p className="p-4 text-sm text-on-surface-variant">No entries yet.</p>
+      ) : (
+        <div className="divide-y divide-surface-variant">
+          {transactions.map((transaction) => (
+            <TransactionRow
+              isWriteDisabled={isWriteDisabled}
+              key={transaction.id}
+              transaction={transaction}
+              onDelete={onDelete}
+              onEdit={onEdit}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

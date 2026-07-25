@@ -10,6 +10,8 @@ This document is an engineering inventory and proposed operating baseline. It is
 | Transactions and descriptions       | Supabase Postgres             | Retained while the account exists; foreign-key cascade on Auth user deletion          | Maximum inactive-account period and any legally required preservation    |
 | Budget preferences/subcategories    | Supabase Postgres             | Same account lifetime and cascade behavior                                            | Same as account data                                                     |
 | Locale, currency, timezone          | Supabase Postgres             | Same account lifetime and cascade behavior                                            | Same as account data                                                     |
+| Recurring schedules/action history  | Supabase Postgres             | Same account lifetime and cascade behavior; actions remain until account deletion     | Same as transaction history                                              |
+| Savings goals                       | Supabase Postgres             | Same account lifetime and cascade behavior                                            | Same as account data                                                     |
 | Browser authentication session      | Origin Web Storage            | Supabase client persistence until sign-out, expiry/revocation, or site-data removal   | Hosted session lifetime and revocation policy                            |
 | Theme and install-prompt preference | Browser local storage         | Until changed or site data is cleared                                                 | Whether user documentation should describe these essential preferences   |
 | PWA shell and hashed static assets  | Browser Cache Storage         | Versioned; old BudgetBuddy caches removed on worker activation                        | Validate actual eviction after every worker change                       |
@@ -25,7 +27,7 @@ The application intentionally does not persist financial records in local storag
 
 ## Account deletion behavior
 
-The live deletion path requires an authenticated session, exact email confirmation, and password reauthentication. The Edge Function deletes the Supabase Auth user using a server-only service-role client; foreign-key cascades remove the four owner-scoped live tables.
+The live deletion path requires an authenticated session, exact email confirmation, and password reauthentication. The Edge Function deletes the Supabase Auth user using a server-only service-role client; foreign-key cascades remove every owner-scoped live table, including recurring schedules, occurrence actions, and savings goals.
 
 Deletion is irreversible in the live application. It does not instantly erase:
 

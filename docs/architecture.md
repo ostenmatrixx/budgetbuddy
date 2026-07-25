@@ -34,7 +34,8 @@ The persisted-session threat tradeoff and alternatives are recorded in [`securit
 ### Owner-scoped financial data
 
 1. The browser queries Supabase directly with the authenticated user’s bearer token.
-2. RLS policies on `transactions`, `budget_preferences`, `transaction_subcategories`, and `user_settings` constrain reads and writes to `auth.uid()`.
+2. RLS policies on transactions, preferences, subcategories, settings, recurring items,
+   occurrence actions, and savings goals constrain reads and writes to `auth.uid()`.
 3. Ownership columns are immutable through policy and database constraints. Transaction creation uses a per-modal UUID and a unique `(user_id, client_request_id)` constraint for retry idempotency.
 4. Financial records remain in React memory while loaded. The service worker does not intercept or cache cross-origin Supabase traffic.
 
@@ -63,12 +64,20 @@ The persisted-session threat tradeoff and alternatives are recorded in [`securit
 
 ## Data model
 
-| Table                       | Ownership             | Important guarantees                                              |
-| --------------------------- | --------------------- | ----------------------------------------------------------------- |
-| `transactions`              | `user_id` → Auth user | Owner RLS, ownership immutability, idempotent client request ID   |
-| `budget_preferences`        | `user_id` → Auth user | One owner preference and constrained target allocation            |
-| `transaction_subcategories` | `user_id` → Auth user | Owner RLS; archival preserves historical transaction labels       |
-| `user_settings`             | `user_id` → Auth user | Owner RLS; constrained currency, locale, and IANA timezone values |
+| Table                          | Ownership             | Important guarantees                                              |
+| ------------------------------ | --------------------- | ----------------------------------------------------------------- |
+| `transactions`                 | `user_id` → Auth user | Owner RLS, ownership immutability, idempotent client request ID   |
+| `budget_preferences`           | `user_id` → Auth user | One owner preference and constrained target allocation            |
+| `transaction_subcategories`    | `user_id` → Auth user | Owner RLS; archival preserves historical transaction labels       |
+| `user_settings`                | `user_id` → Auth user | Owner RLS; constrained currency, locale, and IANA timezone values |
+| `recurring_items`              | `user_id` → Auth user | Owner RLS, anchored schedules, optimistic concurrency             |
+| `recurring_occurrence_actions` | `user_id` → Auth user | Owner-readable immutable record/skip history                      |
+| `savings_goals`                | `user_id` → Auth user | Owner RLS, one active goal per linked savings subcategory         |
+
+Recurring occurrences are never generated in the background. The signed-in user confirms Record or
+Skip, and an authenticated database RPC atomically records the action and advances the anchored
+schedule. Goal progress is calculated from matching owner-scoped savings transactions dated on or
+after the goal tracking start.
 
 Database migrations and pgTAP policy tests live under `supabase/`. The typed browser client contract in `src/types/database.ts` must be regenerated or reviewed whenever a migration changes the exposed schema.
 
@@ -90,7 +99,8 @@ Database migrations and pgTAP policy tests live under `supabase/`. The typed bro
 
 ## Deliberate non-goals
 
-- No bank synchronization, receipt ingestion, persistent offline financial storage, or background mutation queue
+- No bank synchronization, receipt ingestion, persistent offline financial storage, push
+  notifications, automatic recurring transaction creation, or background mutation queue
 - No frontend-only permission model
 - No service-role credentials in Vercel or the browser
 - No session replay or financial analytics telemetry

@@ -8,6 +8,12 @@ The project follows [Semantic Versioning](https://semver.org/) once releases are
 
 ### Added
 
+- Decision-support insights for safe-to-spend pacing, savings rate, budget pace, and prior-month category changes
+- Paginated all-history Activity with search, date/type/amount filters, sorting, editing, deletion, and repeat prefills
+- Mobile bottom navigation, compact category activity, collapsed planning sections, and recent-entry quick prefills
+- Confirm-before-record recurring schedules, savings goals, and a condition-driven in-app alert inbox
+- Owner-scoped recurring, occurrence-action, and savings-goal records with atomic record/skip RPCs
+- Version 2 JSON exports containing recurring schedules, occurrence history, and savings goals
 - Transaction versioning, atomic conflict detection, year-bounded dashboard reads, and an owner-scoped lifetime balance RPC
 - Database-enforced financial-record length limits and expanded owner/RLS/concurrency pgTAP coverage
 - Safety-critical unit coverage thresholds and Chromium, Firefox, and mobile WebKit release smoke tests
@@ -21,6 +27,8 @@ The project follows [Semantic Versioning](https://semver.org/) once releases are
 
 ### Security
 
+- Owner validation, row-level security, account-deletion cascades, and optimistic concurrency for decision-support records
+- Offline blocking for all new financial writes while retaining already-loaded data in memory
 - Automated JavaScript and TypeScript CodeQL analysis on pull requests, `main`, and a weekly schedule
 - Pull-request blocking for newly introduced high or critical dependency vulnerabilities
 - Optimistic transaction concurrency to prevent stale edits or deletes from overwriting newer data

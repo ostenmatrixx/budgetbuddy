@@ -75,7 +75,7 @@ export function UserSettingsProvider({
         const message =
           saveError instanceof Error ? saveError.message : "Unable to save account settings.";
         setError(message);
-        throw new Error(message);
+        throw new Error(message, { cause: saveError });
       } finally {
         setIsSaving(false);
       }

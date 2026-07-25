@@ -12,18 +12,43 @@ import {
 } from "../lib/budget";
 import { toDateInputValue } from "../lib/date";
 import {
+  buildInAppAlerts,
+  calculateMonthlyInsights,
+  calculateSavingsGoalProgress,
+  getRecentTransactionPrefills,
+  getPreviousPeriod,
+  transactionToPrefill
+} from "../lib/decisionSupport";
+import {
+  addRecurringItem,
+  addSavingsGoal,
   addTransactionSubcategory,
   archiveTransactionSubcategory,
   addTransaction,
   deleteTransaction,
   getAccountBalance,
   loadBudgetPreference,
+  loadRecurringItems,
+  loadSavingsGoalProgress,
+  loadSavingsGoals,
   loadTransactionSubcategories,
   loadTransactions,
+  recordRecurringOccurrence,
   saveBudgetPreference,
+  setRecurringItemActive,
+  setSavingsGoalActive,
+  skipRecurringOccurrence,
   TransactionConflictError,
+  updateRecurringItem,
+  updateSavingsGoal,
   updateTransaction
 } from "../lib/storage";
+import type {
+  RecurringItem,
+  RecurringItemDraft,
+  SavingsGoal,
+  SavingsGoalDraft
+} from "../types/decisionSupport";
 import {
   transactionTypes,
   transactionTypeShortLabels,
@@ -34,15 +59,20 @@ import {
   type TransactionType
 } from "../types/transaction";
 import AnnualReportDashboard from "./AnnualReportDashboard";
+import ActivityDashboard from "./ActivityDashboard";
 import AccessibleDialog from "./AccessibleDialog";
 import AccountSettingsPanel from "./AccountSettingsPanel";
+import AlertsButton from "./AlertsButton";
 import BrandIcon from "./BrandIcon";
 import BudgetAllocationCards from "./BudgetAllocationCards";
 import BudgetPreferenceEditor from "./BudgetPreferenceEditor";
 import CalendarWidget from "./CalendarWidget";
 import ConfirmDialog from "./ConfirmDialog";
 import DailyTransactionLog from "./DailyTransactionLog";
+import DecisionSupportPanels from "./DecisionSupportPanels";
 import DashboardViewToggle, { type DashboardView } from "./DashboardViewToggle";
+import MobileBottomNavigation, { type MobileDestination } from "./MobileBottomNavigation";
+import MonthlyInsightsCard from "./MonthlyInsightsCard";
 import MonthlySelector from "./MonthlySelector";
 import PwaInstallPrompt from "./PwaInstallPrompt";
 import SummaryCards from "./SummaryCards";
@@ -61,6 +91,8 @@ interface DashboardProps {
 interface ModalState {
   type?: TransactionType;
   transaction?: Transaction;
+  initialDraft?: TransactionDraft;
+  recurringItem?: RecurringItem;
   date?: string;
   clientRequestId?: string;
 }
@@ -96,7 +128,11 @@ export default function Dashboard({
   const [isSavingBudgetPreference, setIsSavingBudgetPreference] = useState(false);
   const [dataError, setDataError] = useState("");
   const [modalState, setModalState] = useState<ModalState | null>(null);
-  const [view, setView] = useState<DashboardView>("monthly");
+  const [view, setView] = useState<DashboardView>("home");
+  const [recurringItems, setRecurringItems] = useState<RecurringItem[]>([]);
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [savingsGoalAmounts, setSavingsGoalAmounts] = useState<Map<string, number>>(new Map());
+  const [activityRevision, setActivityRevision] = useState(0);
   const [isBudgetEditorOpen, setIsBudgetEditorOpen] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isAccountSettingsBusy, setIsAccountSettingsBusy] = useState(false);
@@ -106,6 +142,8 @@ export default function Dashboard({
   const [hasCreatedTransaction, setHasCreatedTransaction] = useState(false);
   const [activeMobileCategory, setActiveMobileCategory] = useState<TransactionType>("income");
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
+  const [isMobileBudgetOpen, setIsMobileBudgetOpen] = useState(false);
+  const [isMobileCalendarOpen, setIsMobileCalendarOpen] = useState(false);
 
   useEffect(() => {
     const period = getCurrentPeriod(settings.timeZone);
@@ -122,20 +160,25 @@ export default function Dashboard({
       setDataError("");
 
       try {
+        const previousPeriod = getPreviousPeriod(selectedYear, selectedMonth);
         const [
           nextTransactions,
+          previousYearTransactions,
           nextBudgetPreference,
           nextTransactionSubcategories,
           nextTotalBalance
         ] = await Promise.all([
           loadTransactions(userId, selectedYear),
+          previousPeriod.year === selectedYear
+            ? Promise.resolve<Transaction[]>([])
+            : loadTransactions(userId, previousPeriod.year),
           loadBudgetPreference(userId),
           loadTransactionSubcategories(userId),
           getAccountBalance()
         ]);
 
         if (isActive) {
-          setTransactions(nextTransactions);
+          setTransactions([...nextTransactions, ...previousYearTransactions]);
           setBudgetPreference(nextBudgetPreference);
           setTransactionSubcategories(nextTransactionSubcategories);
           setTotalBalance(nextTotalBalance);
@@ -158,7 +201,37 @@ export default function Dashboard({
     return () => {
       isActive = false;
     };
-  }, [selectedYear, userId]);
+  }, [selectedMonth, selectedYear, userId]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function fetchDecisionSupport() {
+      try {
+        const [nextRecurringItems, nextGoals, nextGoalAmounts] = await Promise.all([
+          loadRecurringItems(userId),
+          loadSavingsGoals(userId),
+          loadSavingsGoalProgress()
+        ]);
+        if (isActive) {
+          setRecurringItems(nextRecurringItems);
+          setSavingsGoals(nextGoals);
+          setSavingsGoalAmounts(nextGoalAmounts);
+        }
+      } catch (error) {
+        if (isActive) {
+          setDataError(
+            error instanceof Error ? error.message : "Unable to load plans and savings goals."
+          );
+        }
+      }
+    }
+
+    void fetchDecisionSupport();
+    return () => {
+      isActive = false;
+    };
+  }, [userId]);
 
   const monthlyTransactions = useMemo(
     () => filterTransactionsByMonth(transactions, selectedYear, selectedMonth),
@@ -184,11 +257,51 @@ export default function Dashboard({
     [transactions, selectedYear]
   );
 
-  const activeTitle = view === "monthly" ? "Monthly Dashboard" : "Annual Report";
+  const todayKey = toDateInputValue(new Date(), settings.timeZone);
+  const insights = useMemo(
+    () =>
+      calculateMonthlyInsights(
+        transactions,
+        selectedYear,
+        selectedMonth,
+        budgetPreference,
+        todayKey
+      ),
+    [budgetPreference, selectedMonth, selectedYear, todayKey, transactions]
+  );
+  const recentPrefills = useMemo(
+    () => getRecentTransactionPrefills(transactions, todayKey),
+    [todayKey, transactions]
+  );
+  const goalsWithProgress = useMemo(
+    () =>
+      savingsGoals.map((goal) => ({
+        goal,
+        progress: calculateSavingsGoalProgress(goal, savingsGoalAmounts.get(goal.id) ?? 0, todayKey)
+      })),
+    [savingsGoalAmounts, savingsGoals, todayKey]
+  );
+  const alerts = useMemo(
+    () =>
+      buildInAppAlerts({
+        summary,
+        recurringItems,
+        goals: goalsWithProgress,
+        todayKey
+      }),
+    [goalsWithProgress, recurringItems, summary, todayKey]
+  );
+
+  const activeTitle =
+    view === "home" ? "Monthly Dashboard" : view === "activity" ? "Activity" : "Annual Report";
   const activePeriod =
-    view === "monthly" ? getMonthName(selectedYear, selectedMonth) : `${selectedYear} overview`;
+    view === "home"
+      ? getMonthName(selectedYear, selectedMonth)
+      : view === "activity"
+        ? "All transaction history"
+        : `${selectedYear} overview`;
   const activeRemainingIncome =
-    view === "monthly" ? summary.remainingIncome : annualTopbarSummary.yearly.remainingIncome;
+    view === "reports" ? annualTopbarSummary.yearly.remainingIncome : summary.remainingIncome;
   const userInitial = (userEmail?.trim().charAt(0) || "B").toUpperCase();
 
   const selectedDateTransactions = useMemo(
@@ -202,18 +315,35 @@ export default function Dashboard({
   );
 
   async function refreshTransactions(): Promise<Transaction[]> {
-    const [nextTransactions, nextTotalBalance] = await Promise.all([
+    const previousPeriod = getPreviousPeriod(selectedYear, selectedMonth);
+    const [nextTransactions, previousYearTransactions, nextTotalBalance] = await Promise.all([
       loadTransactions(userId, selectedYear),
+      previousPeriod.year === selectedYear
+        ? Promise.resolve<Transaction[]>([])
+        : loadTransactions(userId, previousPeriod.year),
       getAccountBalance()
     ]);
-    setTransactions(nextTransactions);
+    const combinedTransactions = [...nextTransactions, ...previousYearTransactions];
+    setTransactions(combinedTransactions);
     setTotalBalance(nextTotalBalance);
-    return nextTransactions;
+    setActivityRevision((current) => current + 1);
+    return combinedTransactions;
   }
 
   async function refreshSubcategories() {
     const nextSubcategories = await loadTransactionSubcategories(userId);
     setTransactionSubcategories(nextSubcategories);
+  }
+
+  async function refreshDecisionSupport() {
+    const [nextRecurringItems, nextGoals, nextGoalAmounts] = await Promise.all([
+      loadRecurringItems(userId),
+      loadSavingsGoals(userId),
+      loadSavingsGoalProgress()
+    ]);
+    setRecurringItems(nextRecurringItems);
+    setSavingsGoals(nextGoals);
+    setSavingsGoalAmounts(nextGoalAmounts);
   }
 
   async function handleSaveTransaction(draft: TransactionDraft) {
@@ -232,11 +362,18 @@ export default function Dashboard({
           draft,
           modalState.transaction.version
         );
+      } else if (modalState?.recurringItem) {
+        await recordRecurringOccurrence(
+          modalState.recurringItem,
+          draft,
+          modalState.clientRequestId ?? crypto.randomUUID()
+        );
       } else {
         await addTransaction(userId, draft, modalState?.clientRequestId ?? crypto.randomUUID());
       }
 
       await refreshTransactions();
+      await refreshDecisionSupport();
       if (isNewTransaction) {
         setHasCreatedTransaction(true);
       }
@@ -257,7 +394,7 @@ export default function Dashboard({
       }
 
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   }
 
@@ -282,6 +419,7 @@ export default function Dashboard({
     try {
       await deleteTransaction(userId, transactionToDelete.id, transactionToDelete.version);
       await refreshTransactions();
+      await refreshDecisionSupport();
       setTransactionToDelete(null);
     } catch (error) {
       let message = error instanceof Error ? error.message : "Unable to delete this transaction.";
@@ -319,7 +457,7 @@ export default function Dashboard({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save budget targets.";
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     } finally {
       setIsSavingBudgetPreference(false);
     }
@@ -338,7 +476,7 @@ export default function Dashboard({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to add subcategory.";
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   }
 
@@ -350,14 +488,112 @@ export default function Dashboard({
     setDataError("");
 
     try {
+      const linkedRecurringItems = recurringItems.filter(
+        (item) => item.isActive && item.subcategoryId === subcategory.id
+      );
+      const linkedGoals = savingsGoals.filter(
+        (goal) => goal.isActive && goal.subcategoryId === subcategory.id
+      );
+      await Promise.all([
+        ...linkedRecurringItems.map((item) => setRecurringItemActive(userId, item, false)),
+        ...linkedGoals.map((goal) => setSavingsGoalActive(userId, goal, false))
+      ]);
       await archiveTransactionSubcategory(userId, subcategory.id);
-      await refreshSubcategories();
+      await Promise.all([refreshSubcategories(), refreshDecisionSupport()]);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to archive this subcategory.";
       setDataError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
+  }
+
+  async function handleSaveRecurringItem(
+    item: RecurringItem | undefined,
+    draft: RecurringItemDraft
+  ) {
+    if (isOffline) {
+      throw new Error("Reconnect to save a recurring item.");
+    }
+    try {
+      if (item) {
+        await updateRecurringItem(userId, item, draft);
+      } else {
+        await addRecurringItem(userId, draft);
+      }
+      await refreshDecisionSupport();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to save recurring item.";
+      setDataError(message);
+      throw new Error(message, { cause: error });
+    }
+  }
+
+  async function handleToggleRecurringItem(item: RecurringItem, isActive: boolean) {
+    if (isOffline) {
+      throw new Error("Reconnect to update a recurring item.");
+    }
+    await setRecurringItemActive(userId, item, isActive);
+    await refreshDecisionSupport();
+  }
+
+  async function handleSkipRecurringItem(item: RecurringItem) {
+    if (isOffline) {
+      throw new Error("Reconnect to skip a recurring occurrence.");
+    }
+    await skipRecurringOccurrence(item);
+    await refreshDecisionSupport();
+  }
+
+  function handleRecordRecurringItem(item: RecurringItem) {
+    const subcategory = transactionSubcategories.find((entry) => entry.id === item.subcategoryId);
+    setModalState(
+      createTransactionModalState({
+        recurringItem: item,
+        initialDraft: {
+          type: item.type,
+          subcategory: subcategory?.name,
+          amount: item.amount,
+          date: item.nextDueDate,
+          description: item.description,
+          notes: item.notes
+        }
+      })
+    );
+  }
+
+  async function handleSaveGoal(goal: SavingsGoal | undefined, draft: SavingsGoalDraft) {
+    if (isOffline) {
+      throw new Error("Reconnect to save a savings goal.");
+    }
+    try {
+      if (goal) {
+        await updateSavingsGoal(userId, goal, draft);
+      } else {
+        await addSavingsGoal(userId, draft);
+      }
+      await refreshDecisionSupport();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to save savings goal.";
+      setDataError(message);
+      throw new Error(message, { cause: error });
+    }
+  }
+
+  async function handleToggleGoal(goal: SavingsGoal, isActive: boolean) {
+    if (isOffline) {
+      throw new Error("Reconnect to update a savings goal.");
+    }
+    await setSavingsGoalActive(userId, goal, isActive);
+    await refreshDecisionSupport();
+  }
+
+  function handleRepeatTransaction(transaction: Transaction) {
+    setModalState(
+      createTransactionModalState({
+        initialDraft: transactionToPrefill(transaction, todayKey)
+      })
+    );
   }
 
   function handleMonthChange(year: number, month: number) {
@@ -369,6 +605,12 @@ export default function Dashboard({
   function handleViewChange(nextView: DashboardView) {
     setView(nextView);
     setSelectedDate(undefined);
+  }
+
+  function handleMobileNavigation(destination: MobileDestination) {
+    const nextView: DashboardView =
+      destination === "home" ? "home" : destination === "activity" ? "activity" : "reports";
+    handleViewChange(nextView);
   }
 
   return (
@@ -479,9 +721,11 @@ export default function Dashboard({
               </div>
             </div>
 
+            <AlertsButton alerts={alerts} />
+
             <button
               aria-label="New transaction"
-              className="motion-button motion-icon-button flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-on-primary ambient-shadow transition active:scale-95 hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="motion-button motion-icon-button hidden items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-on-primary ambient-shadow transition active:scale-95 hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-primary/20 md:flex"
               disabled={isOffline}
               title={isOffline ? "Reconnect to add a transaction" : "New transaction"}
               type="button"
@@ -510,44 +754,42 @@ export default function Dashboard({
         </header>
 
         <div
-          className="flex-1 overflow-y-auto px-4 py-5 md:px-6 md:pb-8 md:pt-[5.5rem]"
+          className="flex-1 overflow-y-auto px-4 pb-28 pt-5 md:px-6 md:pb-8 md:pt-[5.5rem]"
           id="dashboard-content"
           tabIndex={-1}
         >
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-            <div className="rounded-xl border border-surface-variant bg-surface-container-lowest p-2 ambient-shadow lg:hidden">
-              <DashboardViewToggle compact view={view} onChange={handleViewChange} />
-            </div>
-
-            <section
-              className="grid grid-cols-2 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest ambient-shadow lg:hidden"
-              aria-label="Financial snapshot"
-            >
-              <article className="min-w-0 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
-                  Remaining income
-                </p>
-                <p
-                  className={`mt-1 truncate text-xl font-bold sm:text-2xl ${
-                    activeRemainingIncome < 0
-                      ? "text-error"
-                      : activeRemainingIncome > 0
-                        ? "text-success"
-                        : "text-on-surface"
-                  }`}
-                >
-                  {formatCurrency(activeRemainingIncome)}
-                </p>
-              </article>
-              <article className="min-w-0 border-l border-surface-variant p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
-                  Total balance
-                </p>
-                <p className="mt-1 truncate text-xl font-bold sm:text-2xl">
-                  {formatCurrency(totalBalance)}
-                </p>
-              </article>
-            </section>
+            {view === "home" ? (
+              <section
+                className="grid grid-cols-2 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest ambient-shadow lg:hidden"
+                aria-label="Financial snapshot"
+              >
+                <article className="min-w-0 p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
+                    Remaining income
+                  </p>
+                  <p
+                    className={`mt-1 truncate text-xl font-bold sm:text-2xl ${
+                      activeRemainingIncome < 0
+                        ? "text-error"
+                        : activeRemainingIncome > 0
+                          ? "text-success"
+                          : "text-on-surface"
+                    }`}
+                  >
+                    {formatCurrency(activeRemainingIncome)}
+                  </p>
+                </article>
+                <article className="min-w-0 border-l border-surface-variant p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
+                    Total balance
+                  </p>
+                  <p className="mt-1 truncate text-xl font-bold sm:text-2xl">
+                    {formatCurrency(totalBalance)}
+                  </p>
+                </article>
+              </section>
+            ) : null}
 
             {dataError ? (
               <div
@@ -562,10 +804,10 @@ export default function Dashboard({
 
             {isLoadingTransactions ? <LoadingTransactionsState /> : null}
 
-            {!isLoadingTransactions && view === "monthly" ? (
+            {!isLoadingTransactions && view === "home" ? (
               <div
                 className="animate-screen-in grid gap-6"
-                key={`monthly-${selectedYear}-${selectedMonth}`}
+                key={`home-${selectedYear}-${selectedMonth}`}
               >
                 <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
                   <div className="flex flex-col gap-5">
@@ -575,22 +817,49 @@ export default function Dashboard({
                       onChange={handleMonthChange}
                     />
                     <SummaryCards hideRemainingBelowDesktop summary={summary} />
-                    <BudgetAllocationCards
-                      isWriteDisabled={isOffline}
-                      preference={budgetPreference}
-                      summary={summary}
-                      onEditTargets={() => setIsBudgetEditorOpen(true)}
-                    />
+                    <MonthlyInsightsCard insights={insights} />
+                    <button
+                      aria-expanded={isMobileBudgetOpen}
+                      className="app-surface flex items-center justify-between p-4 text-left font-bold text-on-surface md:hidden"
+                      type="button"
+                      onClick={() => setIsMobileBudgetOpen((current) => !current)}
+                    >
+                      Budget Targets
+                      <span className="material-symbols-outlined" aria-hidden="true">
+                        {isMobileBudgetOpen ? "expand_less" : "expand_more"}
+                      </span>
+                    </button>
+                    <div className={isMobileBudgetOpen ? "block" : "hidden md:block"}>
+                      <BudgetAllocationCards
+                        isWriteDisabled={isOffline}
+                        preference={budgetPreference}
+                        summary={summary}
+                        onEditTargets={() => setIsBudgetEditorOpen(true)}
+                      />
+                    </div>
                   </div>
                   <div className="flex flex-col gap-4">
-                    <CalendarWidget
-                      locale={settings.locale}
-                      month={selectedMonth}
-                      year={selectedYear}
-                      selectedDate={selectedDate}
-                      transactions={monthlyTransactions}
-                      onSelectDate={setSelectedDate}
-                    />
+                    <button
+                      aria-expanded={isMobileCalendarOpen}
+                      className="app-surface flex items-center justify-between p-4 text-left font-bold text-on-surface md:hidden"
+                      type="button"
+                      onClick={() => setIsMobileCalendarOpen((current) => !current)}
+                    >
+                      Calendar
+                      <span className="material-symbols-outlined" aria-hidden="true">
+                        {isMobileCalendarOpen ? "expand_less" : "expand_more"}
+                      </span>
+                    </button>
+                    <div className={isMobileCalendarOpen ? "block" : "hidden md:block"}>
+                      <CalendarWidget
+                        locale={settings.locale}
+                        month={selectedMonth}
+                        year={selectedYear}
+                        selectedDate={selectedDate}
+                        transactions={monthlyTransactions}
+                        onSelectDate={setSelectedDate}
+                      />
+                    </div>
                     {selectedDate ? (
                       <DailyTransactionLog
                         date={selectedDate}
@@ -603,6 +872,20 @@ export default function Dashboard({
                     ) : null}
                   </div>
                 </section>
+
+                <DecisionSupportPanels
+                  goals={goalsWithProgress}
+                  isWriteDisabled={isOffline}
+                  recurringItems={recurringItems}
+                  subcategoriesByType={subcategoriesByType}
+                  todayKey={todayKey}
+                  onRecordRecurring={handleRecordRecurringItem}
+                  onSaveGoal={handleSaveGoal}
+                  onSaveRecurring={handleSaveRecurringItem}
+                  onSkipRecurring={handleSkipRecurringItem}
+                  onToggleGoal={handleToggleGoal}
+                  onToggleRecurring={handleToggleRecurringItem}
+                />
 
                 <section className="grid gap-5">
                   <nav
@@ -658,7 +941,9 @@ export default function Dashboard({
                           onArchiveSubcategory={handleArchiveSubcategory}
                           onDelete={handleDeleteTransaction}
                           onEdit={(transaction) => setModalState({ transaction })}
+                          onSeeAll={() => handleViewChange("activity")}
                           motionIndex={index}
+                          mobileCompact
                         />
                       </div>
                     ))}
@@ -667,7 +952,16 @@ export default function Dashboard({
               </div>
             ) : null}
 
-            {!isLoadingTransactions && view === "annual" ? (
+            {!isLoadingTransactions && view === "activity" ? (
+              <ActivityDashboard
+                refreshKey={activityRevision}
+                onDelete={handleDeleteTransaction}
+                onEdit={(transaction) => setModalState({ transaction })}
+                onRepeat={handleRepeatTransaction}
+              />
+            ) : null}
+
+            {!isLoadingTransactions && view === "reports" ? (
               <div className="animate-screen-in" key={`annual-${selectedYear}`}>
                 <AnnualReportDashboard
                   transactions={transactions}
@@ -683,6 +977,14 @@ export default function Dashboard({
         </div>
       </div>
 
+      <MobileBottomNavigation
+        active={view === "home" ? "home" : view === "activity" ? "activity" : "reports"}
+        isAddDisabled={isOffline}
+        onAdd={() => setModalState(createTransactionModalState())}
+        onNavigate={handleMobileNavigation}
+        onSettings={() => setIsAccountSettingsOpen(true)}
+      />
+
       {modalState ? (
         <TransactionFormModal
           key={
@@ -692,8 +994,10 @@ export default function Dashboard({
           }
           currencySymbol={currencySymbol}
           defaultDate={modalState.date}
+          initialDraft={modalState.initialDraft}
           initialType={modalState.type}
           isWriteDisabled={isOffline}
+          recentPrefills={recentPrefills}
           transaction={modalState.transaction}
           subcategoriesByType={subcategoriesByType}
           timeZone={settings.timeZone}

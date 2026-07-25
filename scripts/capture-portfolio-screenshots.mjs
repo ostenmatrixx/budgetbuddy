@@ -231,6 +231,32 @@ async function installMockSupabase(page) {
       return;
     }
 
+    if (url.pathname === "/rest/v1/rpc/get_savings_goal_progress") {
+      await fulfillJson(route, []);
+      return;
+    }
+
+    if (url.pathname === "/rest/v1/rpc/get_account_balance") {
+      const balance = transactions.reduce((total, transaction) => {
+        return transaction.type === "income"
+          ? total + Number(transaction.amount)
+          : total - Number(transaction.amount);
+      }, 0);
+      await fulfillJson(route, balance);
+      return;
+    }
+
+    if (url.pathname === "/rest/v1/rpc/search_transactions") {
+      await fulfillJson(
+        route,
+        transactions.map((transaction) => ({
+          ...transaction,
+          total_count: transactions.length
+        }))
+      );
+      return;
+    }
+
     if (url.pathname === "/rest/v1/budget_preferences") {
       await fulfillJson(route, {
         user_id: mockUser.id,
@@ -245,6 +271,15 @@ async function installMockSupabase(page) {
 
     if (url.pathname === "/rest/v1/transaction_subcategories") {
       await fulfillJson(route, subcategories);
+      return;
+    }
+
+    if (
+      url.pathname === "/rest/v1/recurring_items" ||
+      url.pathname === "/rest/v1/recurring_occurrence_actions" ||
+      url.pathname === "/rest/v1/savings_goals"
+    ) {
+      await fulfillJson(route, []);
       return;
     }
 

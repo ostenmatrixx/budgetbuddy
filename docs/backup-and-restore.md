@@ -38,7 +38,9 @@ Use an isolated Supabase test project with no production integrations.
 3. Extract into a newly created private temporary directory.
 4. Review `schema.sql`, `data.sql`, and `roles.sql`; restore them to the isolated project in that order using a restricted administrator connection.
 5. Reapply any Supabase-managed Auth/storage configuration that logical dumps do not cover.
-6. Run `supabase test db`, sign in with drill-only users, and compare per-table row counts and representative exports.
+6. Run `supabase test db`, sign in with drill-only users, and compare per-table row counts and
+   representative version-2 exports, including recurring schedules, occurrence actions, and savings
+   goals.
 7. Record the artifact date, duration, result, discrepancies, and cleanup confirmation. Securely destroy plaintext drill files.
 
 Never test a restore over production. A backup is not considered healthy until a restore drill succeeds.

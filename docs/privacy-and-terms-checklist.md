@@ -23,7 +23,7 @@ Remove a service from the published list when it is genuinely disabled and no lo
 ## Privacy notice content
 
 - [ ] Identify the accountable operator and working privacy/security contact.
-- [ ] Describe collected data by category: identity, authentication/security metadata, regional settings, budget preferences, subcategories, transactions, support messages, and optional sanitized errors.
+- [ ] Describe collected data by category: identity, authentication/security metadata, regional settings, budget preferences, subcategories, transactions, recurring schedules and occurrence actions, savings goals, support messages, and optional sanitized errors.
 - [ ] Explain purposes separately: provide the service, secure accounts, prevent abuse, recover accounts, operate backups, diagnose failures, and communicate essential service messages.
 - [ ] Determine an appropriate legal basis for each purpose with qualified counsel; do not copy another product’s wording.
 - [ ] Explain direct collection from the user and automatic collection by hosting, Auth, Turnstile, SMTP, monitoring, and uptime providers.

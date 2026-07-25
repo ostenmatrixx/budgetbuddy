@@ -19,11 +19,14 @@ import {
   type TransactionType
 } from "../types/transaction";
 import AccessibleDialog from "./AccessibleDialog";
+import type { TransactionPrefill } from "../types/decisionSupport";
 
 interface TransactionFormModalProps {
   defaultDate?: string;
   initialType?: TransactionType;
+  initialDraft?: TransactionDraft;
   isWriteDisabled?: boolean;
+  recentPrefills?: TransactionPrefill[];
   subcategoriesByType: TransactionSubcategoriesByType;
   transaction?: Transaction;
   currencySymbol?: string;
@@ -35,7 +38,9 @@ interface TransactionFormModalProps {
 export default function TransactionFormModal({
   defaultDate,
   initialType,
+  initialDraft,
   isWriteDisabled = false,
+  recentPrefills = [],
   subcategoriesByType,
   transaction,
   currencySymbol = "₱",
@@ -43,14 +48,24 @@ export default function TransactionFormModal({
   onClose,
   onSubmit
 }: TransactionFormModalProps) {
-  const initialSubcategory = normalizeSubcategoryLabel(transaction?.subcategory);
+  const initialSubcategory = normalizeSubcategoryLabel(
+    transaction?.subcategory ?? initialDraft?.subcategory
+  );
   const [values, setValues] = useState<TransactionFormValues>(() => ({
-    type: transaction?.type ?? initialType ?? "",
+    type: transaction?.type ?? initialDraft?.type ?? initialType ?? "",
     subcategory: initialSubcategory,
-    amount: transaction ? String(transaction.amount) : "",
-    date: transaction?.date ?? defaultDate ?? toDateInputValue(new Date(), timeZone),
-    description: transaction?.description ?? "",
-    notes: transaction?.notes ?? ""
+    amount: transaction
+      ? String(transaction.amount)
+      : initialDraft
+        ? String(initialDraft.amount)
+        : "",
+    date:
+      transaction?.date ??
+      initialDraft?.date ??
+      defaultDate ??
+      toDateInputValue(new Date(), timeZone),
+    description: transaction?.description ?? initialDraft?.description ?? "",
+    notes: transaction?.notes ?? initialDraft?.notes ?? ""
   }));
   const [errors, setErrors] = useState<TransactionErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,6 +80,19 @@ export default function TransactionFormModal({
   function updateType(value: string) {
     setValues((current) => ({ ...current, type: value, subcategory: "" }));
     setErrors((current) => ({ ...current, type: undefined, subcategory: undefined }));
+  }
+
+  function applyPrefill(prefill: TransactionPrefill) {
+    setValues({
+      type: prefill.draft.type,
+      subcategory: prefill.draft.subcategory ?? "",
+      amount: String(prefill.draft.amount),
+      date: prefill.draft.date,
+      description: prefill.draft.description,
+      notes: prefill.draft.notes
+    });
+    setErrors({});
+    setSubmitError("");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -161,6 +189,26 @@ export default function TransactionFormModal({
         </div>
 
         <div className="p-5">
+          {!transaction && recentPrefills.length > 0 ? (
+            <section aria-label="Recent transaction shortcuts">
+              <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
+                Repeat a recent entry
+              </p>
+              <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+                {recentPrefills.map((prefill, index) => (
+                  <button
+                    className="motion-button shrink-0 rounded-full border border-surface-variant bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-outline hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    key={`${prefill.label}-${prefill.draft.amount}-${index}`}
+                    type="button"
+                    onClick={() => applyPrefill(prefill)}
+                  >
+                    {prefill.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <section className="rounded-xl border border-surface-variant bg-surface-container-lowest p-6 text-center">
             <label
               className="block text-xs font-bold uppercase tracking-[0.05em] text-outline"
