@@ -53,11 +53,18 @@ test("guards duplicate transaction submission and uses an accessible delete conf
   await installMockSupabase(page, database);
   await signIn(page);
 
-  await page.getByRole("button", { name: /New Transaction/i }).click();
+  await getNewTransactionTrigger(page).click();
   await page.getByLabel("Type").selectOption("bills");
   await page.getByLabel("Transaction amount").fill("125.50");
   await page.getByLabel("Description").fill("Mock grocery run");
   await page.getByRole("button", { name: "Save entry" }).dblclick();
+
+  if (isMobileViewport(page)) {
+    await page
+      .getByRole("navigation", { name: "Transaction category" })
+      .getByRole("button", { name: "Essentials", exact: true })
+      .click();
+  }
 
   await expect(
     page.locator("article:visible").filter({ hasText: "Mock grocery run" }).first()
@@ -93,7 +100,7 @@ test("transaction dialog supports Escape and restores focus to its trigger", asy
 }) => {
   await signIn(page);
 
-  const trigger = page.getByRole("button", { name: /New Transaction/i });
+  const trigger = getNewTransactionTrigger(page);
   await trigger.focus();
   await trigger.click();
 
@@ -118,7 +125,7 @@ test("saves regional settings, downloads a fresh export, and disables writes off
   await installMockSupabase(page, database);
   await signIn(page);
 
-  await page.getByRole("button", { name: "Account settings" }).first().click();
+  await getAccountSettingsTrigger(page).click();
   const settingsDialog = page.getByRole("dialog", { name: "Account Settings" });
   await expect(settingsDialog).toBeVisible();
 
@@ -230,6 +237,30 @@ async function signIn(page: Page) {
   await page.getByLabel("Password", { exact: true }).fill("password-with-spaces  ");
   await page.getByRole("button", { name: "Sign In", exact: true }).last().click();
   await expect(page.getByRole("heading", { name: "Monthly Dashboard" })).toBeVisible();
+}
+
+function isMobileViewport(page: Page) {
+  return (page.viewportSize()?.width ?? 1280) < 768;
+}
+
+function getNewTransactionTrigger(page: Page) {
+  if (isMobileViewport(page)) {
+    return page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Add transaction" });
+  }
+
+  return page.getByRole("button", { name: /New Transaction/i });
+}
+
+function getAccountSettingsTrigger(page: Page) {
+  if (isMobileViewport(page)) {
+    return page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Settings" });
+  }
+
+  return page.getByRole("button", { name: "Account settings" }).first();
 }
 
 async function installMockSupabase(page: Page, database: MockDatabase) {
