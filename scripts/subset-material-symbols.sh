@@ -28,11 +28,20 @@ icons=(
   chevron_right
   close
   cloud_off
+  compare_arrows
+  content_copy
   dashboard
   dark_mode
   delete
   edit
   error
+  event
+  event_busy
+  event_repeat
+  expand_less
+  expand_more
+  flag
+  home
   light_mode
   logout
   manage_accounts
@@ -44,10 +53,13 @@ icons=(
   progress_activity
   receipt_long
   savings
+  search_off
   sell
   settings
   shopping_bag
+  speed
   sync
+  system_update
   system_update_alt
   tune
   visibility
