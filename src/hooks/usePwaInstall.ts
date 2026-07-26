@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { INSTALLED_APP_DISPLAY_MODE_QUERIES, isInstalledAppDisplayMode } from "../lib/pwa";
 
 const INSTALL_DISMISSED_AT_KEY = "budgetbuddy.install-dismissed-at";
 const DISMISSAL_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -26,17 +27,6 @@ if (typeof window !== "undefined") {
     deferredInstallPrompt = null;
     emitInstallPromptChange();
   });
-}
-
-function isStandalone() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const iosNavigator = navigator as Navigator & { standalone?: boolean };
-  return (
-    window.matchMedia("(display-mode: standalone)").matches || iosNavigator.standalone === true
-  );
 }
 
 function isIosDevice() {
@@ -70,18 +60,25 @@ export interface PwaInstallState {
 
 export function usePwaInstall(): PwaInstallState {
   const [, setRevision] = useState(0);
+  const [launchedInstalledApp] = useState(isInstalledAppDisplayMode);
   const [dismissed, setDismissed] = useState(() =>
     typeof window === "undefined" ? false : isDismissed()
   );
 
   useEffect(() => {
     const handleChange = () => setRevision((current) => current + 1);
-    const standaloneMedia = window.matchMedia("(display-mode: standalone)");
+    const installedDisplayModes = INSTALLED_APP_DISPLAY_MODE_QUERIES.map((query) =>
+      window.matchMedia(query)
+    );
     installPromptListeners.add(handleChange);
-    standaloneMedia.addEventListener?.("change", handleChange);
+    installedDisplayModes.forEach((displayMode) =>
+      displayMode.addEventListener?.("change", handleChange)
+    );
     return () => {
       installPromptListeners.delete(handleChange);
-      standaloneMedia.removeEventListener?.("change", handleChange);
+      installedDisplayModes.forEach((displayMode) =>
+        displayMode.removeEventListener?.("change", handleChange)
+      );
     };
   }, []);
 
@@ -107,7 +104,7 @@ export function usePwaInstall(): PwaInstallState {
     return outcome === "accepted";
   }, []);
 
-  const standalone = isStandalone();
+  const standalone = launchedInstalledApp || isInstalledAppDisplayMode();
 
   return {
     canInstall: !standalone && deferredInstallPrompt !== null,

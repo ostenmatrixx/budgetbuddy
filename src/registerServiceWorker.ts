@@ -1,3 +1,5 @@
+import { isInstalledAppDisplayMode } from "./lib/pwa";
+
 export type ServiceWorkerLifecycle =
   "unsupported" | "idle" | "installing" | "waiting" | "ready" | "error";
 
@@ -18,22 +20,11 @@ let isStatusListenerRegistered = false;
 let snapshot: ServiceWorkerSnapshot = {
   isInstalled:
     isServiceWorkerSupported &&
-    (Boolean(navigator.serviceWorker.controller) || isStandaloneDisplayMode()),
+    (Boolean(navigator.serviceWorker.controller) || isInstalledAppDisplayMode()),
   isOffline: typeof navigator !== "undefined" ? !navigator.onLine : false,
   lifecycle: isServiceWorkerSupported ? "idle" : "unsupported",
   updateAvailable: false
 };
-
-function isStandaloneDisplayMode() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const iosNavigator = navigator as Navigator & { standalone?: boolean };
-  return (
-    window.matchMedia("(display-mode: standalone)").matches || iosNavigator.standalone === true
-  );
-}
 
 function publish(next: Partial<ServiceWorkerSnapshot>) {
   snapshot = { ...snapshot, ...next };
