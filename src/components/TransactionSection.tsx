@@ -143,9 +143,7 @@ export default function TransactionSection({
         </div>
 
         <div className="p-5 pt-0">
-          <div className={mobileCompact ? "hidden lg:block" : undefined}>
-            <CategoryPieChart segments={pieSegments} />
-          </div>
+          <CategoryPieChart segments={pieSegments} />
 
           {subcategoryGroups.length > 1 ? (
             <SubcategoryNav
