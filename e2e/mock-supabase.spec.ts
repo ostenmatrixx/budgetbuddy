@@ -163,6 +163,7 @@ test("uses bottom navigation on mobile and opens the central add action", async 
 
   const primaryNavigation = page.getByRole("navigation", { name: "Primary" });
   await expect(primaryNavigation).toBeVisible();
+  await expect(page.getByRole("img", { name: "No category entries yet" })).toBeVisible();
 
   await primaryNavigation.getByRole("button", { name: "Activity" }).click();
   await expect(page.getByRole("heading", { name: "Activity", level: 2 })).toBeVisible();
