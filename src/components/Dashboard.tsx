@@ -142,7 +142,7 @@ export default function Dashboard({
   const [hasCreatedTransaction, setHasCreatedTransaction] = useState(false);
   const [activeMobileCategory, setActiveMobileCategory] = useState<TransactionType>("income");
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
-  const [isMobileBudgetOpen, setIsMobileBudgetOpen] = useState(false);
+  const [isMobileBudgetOpen, setIsMobileBudgetOpen] = useState(true);
   const [isMobileCalendarOpen, setIsMobileCalendarOpen] = useState(false);
 
   useEffect(() => {
@@ -691,7 +691,7 @@ export default function Dashboard({
         </div>
       </aside>
 
-      <div className="flex min-h-screen flex-col md:pl-64">
+      <div className="flex min-h-screen min-w-0 flex-col md:pl-64">
         <header className="animate-slide-up sticky top-0 z-30 flex min-h-14 items-center justify-between gap-2 border-b border-surface-variant bg-surface px-4 py-3 md:fixed md:left-64 md:right-0 md:h-14 md:gap-3 md:px-6 md:py-0">
           <div className="flex min-w-0 items-center gap-2 md:gap-3">
             <BrandIcon className="h-6 w-6 shrink-0 md:hidden" />
@@ -754,7 +754,7 @@ export default function Dashboard({
         </header>
 
         <div
-          className="flex-1 overflow-y-auto px-4 pb-28 pt-5 md:px-6 md:pb-8 md:pt-[5.5rem]"
+          className="min-w-0 flex-1 overflow-y-auto px-4 pb-28 pt-5 md:px-6 md:pb-8 md:pt-[5.5rem]"
           id="dashboard-content"
           tabIndex={-1}
         >
@@ -769,7 +769,7 @@ export default function Dashboard({
                     Remaining income
                   </p>
                   <p
-                    className={`mt-1 truncate text-xl font-bold sm:text-2xl ${
+                    className={`mt-1 break-all text-lg font-bold tabular-nums sm:text-2xl ${
                       activeRemainingIncome < 0
                         ? "text-error"
                         : activeRemainingIncome > 0
@@ -784,7 +784,7 @@ export default function Dashboard({
                   <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
                     Total balance
                   </p>
-                  <p className="mt-1 truncate text-xl font-bold sm:text-2xl">
+                  <p className="mt-1 break-all text-lg font-bold tabular-nums sm:text-2xl">
                     {formatCurrency(totalBalance)}
                   </p>
                 </article>
@@ -941,9 +941,7 @@ export default function Dashboard({
                           onArchiveSubcategory={handleArchiveSubcategory}
                           onDelete={handleDeleteTransaction}
                           onEdit={(transaction) => setModalState({ transaction })}
-                          onSeeAll={() => handleViewChange("activity")}
                           motionIndex={index}
-                          mobileCompact
                         />
                       </div>
                     ))}

@@ -33,4 +33,23 @@ describe("CategoryPieChart", () => {
     expect(sliceCircles[0]).toHaveAttribute("stroke-dasharray", "43.55 100");
     expect(container.querySelector("svg line")).not.toBeInTheDocument();
   });
+
+  it("orders the legend and top category from highest to lowest value", () => {
+    const { container } = render(
+      <CategoryPieChart
+        segments={[
+          { label: "Travel", percentage: 20, value: 200 },
+          { label: "Food", percentage: 50, value: 500 },
+          { label: "Books", percentage: 30, value: 300 }
+        ]}
+      />
+    );
+
+    const legendLabels = Array.from(container.querySelectorAll('[role="listitem"]')).map(
+      (item) => item.textContent
+    );
+
+    expect(legendLabels).toEqual(["Food50%₱500.00", "Books30%₱300.00", "Travel20%₱200.00"]);
+    expect(container.querySelector('[role="img"]')).toHaveTextContent("TopFood");
+  });
 });

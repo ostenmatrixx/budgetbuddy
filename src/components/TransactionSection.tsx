@@ -44,13 +44,11 @@ interface TransactionSectionProps {
   year: number;
   month: number;
   motionIndex?: number;
-  mobileCompact?: boolean;
   onAdd: () => void;
   onAddSubcategory: (type: TransactionType, name: string) => Promise<void>;
   onArchiveSubcategory: (subcategory: TransactionSubcategoryOption) => Promise<void>;
   onDelete: (transaction: Transaction) => void;
   onEdit: (transaction: Transaction) => void;
-  onSeeAll?: () => void;
 }
 
 export default function TransactionSection({
@@ -62,13 +60,11 @@ export default function TransactionSection({
   year,
   month,
   motionIndex = 0,
-  mobileCompact = false,
   onAdd,
   onAddSubcategory,
   onArchiveSubcategory,
   onDelete,
-  onEdit,
-  onSeeAll
+  onEdit
 }: TransactionSectionProps) {
   const { formatCurrency } = useUserSettings();
   const [isManagingSubcategories, setIsManagingSubcategories] = useState(false);
@@ -102,7 +98,7 @@ export default function TransactionSection({
       <section
         className={`app-surface animate-card-in stagger-${(motionIndex % 6) + 1} motion-card overflow-hidden`}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-surface-variant p-5">
+        <div className="flex flex-col items-stretch gap-4 border-b border-surface-variant p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
           <div className="flex min-w-0 items-center gap-4">
             <span
               aria-hidden="true"
@@ -113,15 +109,15 @@ export default function TransactionSection({
             </span>
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">Category</p>
-              <h2 className="mt-1 truncate text-2xl font-bold text-on-surface">
+              <h2 className="mt-1 break-words text-xl font-bold text-on-surface [overflow-wrap:anywhere] sm:text-2xl">
                 {transactionTypeLabels[type]}
               </h2>
-              <p className="mt-1 text-sm font-semibold text-on-surface-variant">
+              <p className="mt-1 break-words text-sm font-semibold text-on-surface-variant [overflow-wrap:anywhere]">
                 {formatCurrency(total)} recorded this month
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center justify-end gap-2 self-end sm:self-auto">
             <CategoryActionButton
               disabled={isWriteDisabled}
               label="Add transaction"
@@ -142,7 +138,7 @@ export default function TransactionSection({
           </div>
         </div>
 
-        <div className="p-5 pt-0">
+        <div className="min-w-0 p-4 pt-0 sm:p-5 sm:pt-0">
           <CategoryPieChart segments={pieSegments} />
 
           {subcategoryGroups.length > 1 ? (
@@ -156,42 +152,29 @@ export default function TransactionSection({
 
           <div className="mt-5 grid gap-3">
             {selectedSubcategoryGroup ? (
-              <>
-                {mobileCompact ? (
-                  <CompactTransactionList
-                    group={selectedSubcategoryGroup}
-                    isWriteDisabled={isWriteDisabled}
-                    onDelete={onDelete}
-                    onEdit={onEdit}
-                    onSeeAll={onSeeAll}
-                  />
-                ) : null}
-                <div className={mobileCompact ? "hidden lg:block" : undefined}>
-                  <SubcategoryCard
-                    labelledBy={
-                      subcategoryGroups.length > 1
-                        ? getSubcategoryTabId(
-                            subcategoryTabsId,
-                            subcategoryGroups.indexOf(selectedSubcategoryGroup)
-                          )
-                        : undefined
-                    }
-                    panelId={
-                      subcategoryGroups.length > 1
-                        ? getSubcategoryPanelId(
-                            subcategoryTabsId,
-                            subcategoryGroups.indexOf(selectedSubcategoryGroup)
-                          )
-                        : undefined
-                    }
-                    group={selectedSubcategoryGroup}
-                    isWriteDisabled={isWriteDisabled}
-                    key={selectedSubcategoryGroup.label}
-                    onDelete={onDelete}
-                    onEdit={onEdit}
-                  />
-                </div>
-              </>
+              <SubcategoryCard
+                labelledBy={
+                  subcategoryGroups.length > 1
+                    ? getSubcategoryTabId(
+                        subcategoryTabsId,
+                        subcategoryGroups.indexOf(selectedSubcategoryGroup)
+                      )
+                    : undefined
+                }
+                panelId={
+                  subcategoryGroups.length > 1
+                    ? getSubcategoryPanelId(
+                        subcategoryTabsId,
+                        subcategoryGroups.indexOf(selectedSubcategoryGroup)
+                      )
+                    : undefined
+                }
+                group={selectedSubcategoryGroup}
+                isWriteDisabled={isWriteDisabled}
+                key={selectedSubcategoryGroup.label}
+                onDelete={onDelete}
+                onEdit={onEdit}
+              />
             ) : null}
           </div>
         </div>
@@ -565,57 +548,6 @@ function SubcategoryManagerModal({
   );
 }
 
-function CompactTransactionList({
-  group,
-  isWriteDisabled,
-  onDelete,
-  onEdit,
-  onSeeAll
-}: {
-  group: SubcategoryGroup;
-  isWriteDisabled: boolean;
-  onDelete: (transaction: Transaction) => void;
-  onEdit: (transaction: Transaction) => void;
-  onSeeAll?: () => void;
-}) {
-  const transactions = sortTransactionsForDisplay(group.transactions, "newest").slice(0, 3);
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest lg:hidden">
-      <div className="flex items-center justify-between gap-3 border-b border-surface-variant p-3">
-        <div>
-          <h3 className="font-bold text-on-surface">{group.label}</h3>
-          <p className="text-xs font-semibold text-outline">Latest three entries</p>
-        </div>
-        {onSeeAll ? (
-          <button
-            className="motion-button rounded-lg px-3 py-2 text-xs font-bold text-primary hover:bg-surface-container-low"
-            type="button"
-            onClick={onSeeAll}
-          >
-            See all
-          </button>
-        ) : null}
-      </div>
-      {transactions.length === 0 ? (
-        <p className="p-4 text-sm text-on-surface-variant">No entries yet.</p>
-      ) : (
-        <div className="divide-y divide-surface-variant">
-          {transactions.map((transaction) => (
-            <TransactionRow
-              isWriteDisabled={isWriteDisabled}
-              key={transaction.id}
-              transaction={transaction}
-              onDelete={onDelete}
-              onEdit={onEdit}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 interface SubcategoryCardProps {
   group: SubcategoryGroup;
   isWriteDisabled: boolean;
@@ -645,14 +577,16 @@ function SubcategoryCard({
       role={labelledBy ? "tabpanel" : undefined}
       tabIndex={labelledBy ? 0 : undefined}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-surface-variant p-4">
-        <div>
-          <h3 className="text-lg font-bold text-on-surface">{group.label}</h3>
+      <div className="flex flex-col items-stretch gap-3 border-b border-surface-variant p-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="break-words text-lg font-bold text-on-surface [overflow-wrap:anywhere]">
+            {group.label}
+          </h3>
           <p className="mt-1 text-xs font-semibold text-outline">
             {group.transactions.length} {entryLabel}
           </p>
         </div>
-        <strong className="rounded-full bg-surface-container px-3 py-1 text-sm text-on-surface">
+        <strong className="max-w-full self-start break-all rounded-full bg-surface-container px-3 py-1 text-sm text-on-surface tabular-nums sm:text-right">
           {formatCurrency(group.total)}
         </strong>
       </div>
@@ -706,7 +640,7 @@ function PaginatedTransactionList({
     <div>
       <TransactionListToolbar sortOrder={sortOrder} onChangeSortOrder={setSortOrder} />
 
-      <div aria-live="polite" className={`${listClassName} min-h-[22.5rem]`}>
+      <div aria-live="polite" className={`${listClassName} sm:min-h-[22.5rem]`}>
         {page.items.map((transaction) => (
           <TransactionRow
             isWriteDisabled={isWriteDisabled}
@@ -779,27 +713,31 @@ function PaginationFooter({
   return (
     <nav
       aria-label="Transaction pages"
-      className="flex items-center justify-between gap-3 border-t border-surface-variant bg-surface-container-low/50 px-4 py-3 text-xs"
+      className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-surface-variant bg-surface-container-low/50 px-3 py-3 text-xs sm:gap-3 sm:px-4"
     >
       <button
-        className="motion-button motion-icon-button inline-flex items-center gap-1 rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        aria-label="Previous page"
+        className="motion-button motion-icon-button inline-flex min-w-0 items-center justify-center gap-1 justify-self-start rounded-lg border border-surface-variant bg-surface-container-lowest px-2 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
         type="button"
         disabled={!hasPreviousPage}
+        title="Previous page"
         onClick={() => onPageChange(currentPage - 1)}
       >
         <MaterialIcon className="text-[18px]" name="chevron_left" />
-        Previous
+        <span className="hidden sm:inline">Previous</span>
       </button>
       <span aria-live="polite" className="font-semibold text-outline">
         Page {currentPage} of {totalPages}
       </span>
       <button
-        className="motion-button motion-icon-button inline-flex items-center gap-1 rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        aria-label="Next page"
+        className="motion-button motion-icon-button inline-flex min-w-0 items-center justify-center gap-1 justify-self-end rounded-lg border border-surface-variant bg-surface-container-lowest px-2 py-2 font-bold text-on-surface-variant transition hover:border-outline hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
         type="button"
         disabled={!hasNextPage}
+        title="Next page"
         onClick={() => onPageChange(currentPage + 1)}
       >
-        Next
+        <span className="hidden sm:inline">Next</span>
         <MaterialIcon className="text-[18px]" name="chevron_right" />
       </button>
     </nav>
@@ -827,15 +765,19 @@ function TransactionRow({ isWriteDisabled, transaction, onDelete, onEdit }: Tran
           {getCategoryIcon(transaction.type)}
         </span>
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-on-surface">{transaction.description}</p>
-          <p className="mt-1 truncate text-xs font-semibold text-outline">
+          <p className="break-words text-sm font-bold text-on-surface [overflow-wrap:anywhere] sm:truncate">
+            {transaction.description}
+          </p>
+          <p className="mt-1 break-words text-xs font-semibold text-outline [overflow-wrap:anywhere] sm:truncate">
             {subcategory} · {formatDate(transaction.date)}
             {transaction.notes ? ` · ${transaction.notes}` : ""}
           </p>
         </div>
       </div>
       <div className="flex items-center gap-2 sm:justify-end">
-        <strong className="mr-auto text-sm sm:mr-3">{formatCurrency(transaction.amount)}</strong>
+        <strong className="mr-auto min-w-0 break-all text-sm tabular-nums sm:mr-3">
+          {formatCurrency(transaction.amount)}
+        </strong>
         <IconButton
           disabled={isWriteDisabled}
           label="Edit transaction"
