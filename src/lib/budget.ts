@@ -352,11 +352,13 @@ export function calculateCategoryPieSegments(
     new Map()
   );
 
-  return Array.from(totalsByCategory.entries()).map(([label, value]) => ({
-    label,
-    value,
-    percentage: total > 0 ? Math.round((value / total) * 100) : 0
-  }));
+  return Array.from(totalsByCategory.entries())
+    .map(([label, value]) => ({
+      label,
+      value,
+      percentage: total > 0 ? Math.round((value / total) * 100) : 0
+    }))
+    .sort((first, second) => second.value - first.value || first.label.localeCompare(second.label));
 }
 
 export function calculateSubcategoryGroups(

@@ -18,12 +18,15 @@ const segmentColors = [
 
 export default function CategoryPieChart({ segments }: CategoryPieChartProps) {
   const { formatCurrency } = useUserSettings();
-  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
-  const topSegment = segments.find((segment) => segment.value > 0);
-  const ringSegments = buildRingSegments(segments);
+  const sortedSegments = [...segments].sort(
+    (first, second) => second.value - first.value || first.label.localeCompare(second.label)
+  );
+  const total = sortedSegments.reduce((sum, segment) => sum + segment.value, 0);
+  const topSegment = sortedSegments.find((segment) => segment.value > 0);
+  const ringSegments = buildRingSegments(sortedSegments);
 
   return (
-    <div className="animate-card-in mt-5 grid gap-5 rounded-xl border border-surface-variant bg-surface-container-lowest p-4 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center">
+    <div className="animate-card-in mt-5 grid min-w-0 gap-5 rounded-xl border border-surface-variant bg-surface-container-lowest p-4 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center">
       <div className="flex justify-center">
         <div
           aria-label={total > 0 ? "Category donut chart" : "No category entries yet"}
@@ -59,27 +62,34 @@ export default function CategoryPieChart({ segments }: CategoryPieChartProps) {
         </div>
       </div>
 
-      <div className="grid gap-3">
-        {segments.length === 0 ? (
+      <div
+        aria-label={sortedSegments.length > 0 ? "Category totals" : undefined}
+        className="grid min-w-0 gap-3"
+        role={sortedSegments.length > 0 ? "list" : undefined}
+      >
+        {sortedSegments.length === 0 ? (
           <p className="rounded-lg bg-surface-container-low px-3 py-3 text-sm font-medium text-on-surface-variant">
             No category entries yet.
           </p>
         ) : null}
-        {segments.map((segment, index) => (
+        {sortedSegments.map((segment, index) => (
           <div
             className={`animate-slide-up stagger-${(index % 6) + 1} grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-sm`}
             key={segment.label}
+            role="listitem"
           >
-            <span className="flex min-w-0 items-center gap-2 text-on-surface-variant">
+            <span className="flex min-w-0 items-start gap-2 text-on-surface-variant">
               <span
-                className="h-3 w-3 shrink-0 rounded-full"
+                className="mt-0.5 h-3 w-3 shrink-0 rounded-full"
                 style={{ backgroundColor: segmentColors[index % segmentColors.length] }}
               />
-              <span className="truncate font-semibold">{segment.label}</span>
+              <span className="min-w-0 break-words font-semibold [overflow-wrap:anywhere]">
+                {segment.label}
+              </span>
             </span>
-            <span className="text-right">
+            <span className="min-w-0 text-right tabular-nums">
               <strong className="block text-sm text-on-surface">{segment.percentage}%</strong>
-              <span className="block text-xs font-semibold text-outline">
+              <span className="block break-all text-xs font-semibold text-outline">
                 {formatCurrency(segment.value)}
               </span>
             </span>

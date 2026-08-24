@@ -20,29 +20,38 @@ export default function BudgetAllocationCards({
       label: `${preference.essentialsPercent}% Essentials`,
       target: summary.essentialsTarget,
       actual: summary.billsSpent,
-      remainingLabel: "Essentials remaining",
-      remaining: summary.essentialsRemaining
+      difference: summary.essentialsRemaining,
+      remainingLabel:
+        summary.essentialsRemaining < 0 ? "Essentials over target" : "Essentials remaining",
+      positiveOverTarget: false
     },
     {
       label: `${preference.savingsPercent}% Savings`,
       target: summary.savingsTarget,
       actual: summary.savingsSaved,
+      difference: summary.savingsTarget - summary.savingsSaved,
       remainingLabel:
         summary.savingsSaved > summary.savingsTarget ? "Saved beyond target" : "Savings to target",
-      remaining: Math.abs(summary.savingsTarget - summary.savingsSaved),
       positiveOverTarget: true
     },
     {
       label: `${preference.nonEssentialsPercent}% Non-Essentials`,
       target: summary.nonEssentialsTarget,
       actual: summary.nonEssentialsSpent,
-      remainingLabel: "Non-essentials remaining",
-      remaining: summary.nonEssentialsRemaining
+      difference: summary.nonEssentialsRemaining,
+      remainingLabel:
+        summary.nonEssentialsRemaining < 0
+          ? "Non-essentials over target"
+          : "Non-essentials remaining",
+      positiveOverTarget: false
     }
   ];
 
   return (
-    <section className="app-surface animate-card-in stagger-2 p-5" aria-label="Budget targets">
+    <section
+      className="app-surface animate-card-in stagger-2 min-w-0 p-4 sm:p-5"
+      aria-label="Budget targets"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-on-surface">Budget Targets</h2>
@@ -65,8 +74,13 @@ export default function BudgetAllocationCards({
 
       <div className="mt-4 grid gap-3 xl:grid-cols-3">
         {cards.map((card, index) => {
-          const isOver = !card.positiveOverTarget && card.remaining < 0;
-          const percent = progressPercent(card.actual, card.target);
+          const isBeyondTarget = card.difference < 0;
+          const isOver = !card.positiveOverTarget && isBeyondTarget;
+          const isPositiveBeyondTarget = card.positiveOverTarget && isBeyondTarget;
+          const barPercent = progressPercent(card.actual, card.target);
+          const actualPercent =
+            card.target > 0 ? Math.max(0, Math.round((card.actual / card.target) * 100)) : 0;
+          const remaining = Math.abs(card.difference);
 
           return (
             <article
@@ -84,33 +98,43 @@ export default function BudgetAllocationCards({
                   className={`rounded-full px-2.5 py-1 font-label-sm text-label-sm ${
                     isOver
                       ? "bg-error-container text-error"
-                      : "bg-surface-container text-on-surface-variant"
+                      : isPositiveBeyondTarget
+                        ? "bg-surface-container text-success"
+                        : "bg-surface-container text-on-surface-variant"
                   }`}
                 >
-                  {percent}%
+                  {actualPercent}%
                 </span>
               </div>
 
               <div className="mt-4 h-3 overflow-hidden rounded-full bg-surface-container">
                 <div
                   className="animate-bar-fill h-full rounded-full bg-primary transition-all duration-500"
-                  style={{ width: `${percent}%` }}
+                  style={{ width: `${barPercent}%` }}
                 />
               </div>
 
               <div className="mt-4 grid gap-2 text-sm">
-                <p className="flex justify-between gap-3">
+                <p className="grid grid-cols-[minmax(0,1fr)_minmax(0,auto)] gap-3">
                   <span className="text-on-surface-variant">Actual</span>
-                  <strong className="text-on-surface">{formatCurrency(card.actual)}</strong>
+                  <strong className="min-w-0 break-all text-right text-on-surface tabular-nums">
+                    {formatCurrency(card.actual)}
+                  </strong>
                 </p>
-                <p className="flex items-start justify-between gap-3">
-                  <span className="min-w-0 text-on-surface-variant">{card.remainingLabel}</span>
+                <p className="grid grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-start gap-3 rounded-lg bg-surface-container-low px-3 py-2">
+                  <span className="min-w-0 break-words font-semibold text-on-surface-variant">
+                    {card.remainingLabel}
+                  </span>
                   <strong
-                    className={`shrink-0 whitespace-nowrap text-right ${
-                      isOver ? "text-primary" : "text-on-surface"
+                    className={`min-w-0 break-all text-right tabular-nums ${
+                      isOver
+                        ? "text-error"
+                        : isPositiveBeyondTarget
+                          ? "text-success"
+                          : "text-on-surface"
                     }`}
                   >
-                    {formatCurrency(card.remaining)}
+                    {formatCurrency(remaining)}
                   </strong>
                 </p>
               </div>
