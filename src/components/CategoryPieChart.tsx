@@ -62,7 +62,11 @@ export default function CategoryPieChart({ segments }: CategoryPieChartProps) {
         </div>
       </div>
 
-      <div aria-label="Category totals" className="grid min-w-0 gap-3" role="list">
+      <div
+        aria-label={sortedSegments.length > 0 ? "Category totals" : undefined}
+        className="grid min-w-0 gap-3"
+        role={sortedSegments.length > 0 ? "list" : undefined}
+      >
         {sortedSegments.length === 0 ? (
           <p className="rounded-lg bg-surface-container-low px-3 py-3 text-sm font-medium text-on-surface-variant">
             No category entries yet.
