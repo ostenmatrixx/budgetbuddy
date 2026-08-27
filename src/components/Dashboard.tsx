@@ -7,6 +7,7 @@ import {
   calculateCategoryPieSegments,
   calculateBudgetSummary,
   filterTransactionsByMonth,
+  getLastDateOfMonth,
   getMonthName,
   type BudgetPreference
 } from "../lib/budget";
@@ -27,6 +28,7 @@ import {
   addTransaction,
   deleteTransaction,
   getAccountBalance,
+  getSavingsBalance,
   loadBudgetPreference,
   loadRecurringItems,
   loadSavingsGoalProgress,
@@ -118,6 +120,9 @@ export default function Dashboard({
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalBalance, setTotalBalance] = useState(0);
+  const [currentSavingsBalance, setCurrentSavingsBalance] = useState(0);
+  const [selectedPeriodSavingsBalance, setSelectedPeriodSavingsBalance] = useState(0);
+  const [yearEndSavingsBalance, setYearEndSavingsBalance] = useState(0);
   const [transactionSubcategories, setTransactionSubcategories] = useState<
     TransactionSubcategoryOption[]
   >([]);
@@ -166,7 +171,10 @@ export default function Dashboard({
           previousYearTransactions,
           nextBudgetPreference,
           nextTransactionSubcategories,
-          nextTotalBalance
+          nextTotalBalance,
+          nextCurrentSavingsBalance,
+          nextSelectedPeriodSavingsBalance,
+          nextYearEndSavingsBalance
         ] = await Promise.all([
           loadTransactions(userId, selectedYear),
           previousPeriod.year === selectedYear
@@ -174,7 +182,10 @@ export default function Dashboard({
             : loadTransactions(userId, previousPeriod.year),
           loadBudgetPreference(userId),
           loadTransactionSubcategories(userId),
-          getAccountBalance()
+          getAccountBalance(),
+          getSavingsBalance(),
+          getSavingsBalance(getLastDateOfMonth(selectedYear, selectedMonth)),
+          getSavingsBalance(`${selectedYear}-12-31`)
         ]);
 
         if (isActive) {
@@ -182,6 +193,9 @@ export default function Dashboard({
           setBudgetPreference(nextBudgetPreference);
           setTransactionSubcategories(nextTransactionSubcategories);
           setTotalBalance(nextTotalBalance);
+          setCurrentSavingsBalance(nextCurrentSavingsBalance);
+          setSelectedPeriodSavingsBalance(nextSelectedPeriodSavingsBalance);
+          setYearEndSavingsBalance(nextYearEndSavingsBalance);
         }
       } catch (error) {
         if (isActive) {
@@ -248,8 +262,11 @@ export default function Dashboard({
   );
 
   const summary = useMemo(
-    () => calculateBudgetSummary(transactions, selectedYear, selectedMonth, budgetPreference),
-    [budgetPreference, transactions, selectedMonth, selectedYear]
+    () => ({
+      ...calculateBudgetSummary(transactions, selectedYear, selectedMonth, budgetPreference),
+      savingsBalance: selectedPeriodSavingsBalance
+    }),
+    [budgetPreference, selectedMonth, selectedPeriodSavingsBalance, selectedYear, transactions]
   );
 
   const annualTopbarSummary = useMemo(
@@ -316,16 +333,29 @@ export default function Dashboard({
 
   async function refreshTransactions(): Promise<Transaction[]> {
     const previousPeriod = getPreviousPeriod(selectedYear, selectedMonth);
-    const [nextTransactions, previousYearTransactions, nextTotalBalance] = await Promise.all([
+    const [
+      nextTransactions,
+      previousYearTransactions,
+      nextTotalBalance,
+      nextCurrentSavingsBalance,
+      nextSelectedPeriodSavingsBalance,
+      nextYearEndSavingsBalance
+    ] = await Promise.all([
       loadTransactions(userId, selectedYear),
       previousPeriod.year === selectedYear
         ? Promise.resolve<Transaction[]>([])
         : loadTransactions(userId, previousPeriod.year),
-      getAccountBalance()
+      getAccountBalance(),
+      getSavingsBalance(),
+      getSavingsBalance(getLastDateOfMonth(selectedYear, selectedMonth)),
+      getSavingsBalance(`${selectedYear}-12-31`)
     ]);
     const combinedTransactions = [...nextTransactions, ...previousYearTransactions];
     setTransactions(combinedTransactions);
     setTotalBalance(nextTotalBalance);
+    setCurrentSavingsBalance(nextCurrentSavingsBalance);
+    setSelectedPeriodSavingsBalance(nextSelectedPeriodSavingsBalance);
+    setYearEndSavingsBalance(nextYearEndSavingsBalance);
     setActivityRevision((current) => current + 1);
     return combinedTransactions;
   }
@@ -353,6 +383,16 @@ export default function Dashboard({
 
     setDataError("");
     const isNewTransaction = !modalState?.transaction;
+
+    if (draft.type === "savings_withdrawal") {
+      const availableSavings = await getSavingsBalance(draft.date, modalState?.transaction?.id);
+
+      if (draft.amount > availableSavings) {
+        throw new Error(
+          `This withdrawal exceeds the ${formatCurrency(Math.max(0, availableSavings))} available in savings on ${draft.date}.`
+        );
+      }
+    }
 
     try {
       if (modalState?.transaction) {
@@ -707,7 +747,7 @@ export default function Dashboard({
             <div className="hidden items-end gap-6 lg:flex">
               <div className="text-right">
                 <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
-                  Remaining income
+                  Remaining funds
                 </p>
                 <p className="text-lg font-bold text-on-surface">
                   {formatCurrency(activeRemainingIncome)}
@@ -715,7 +755,7 @@ export default function Dashboard({
               </div>
               <div className="text-right">
                 <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
-                  Total balance
+                  Available balance
                 </p>
                 <p className="text-lg font-bold text-on-surface">{formatCurrency(totalBalance)}</p>
               </div>
@@ -766,7 +806,7 @@ export default function Dashboard({
               >
                 <article className="min-w-0 p-4">
                   <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
-                    Remaining income
+                    Remaining funds
                   </p>
                   <p
                     className={`mt-1 break-all text-lg font-bold tabular-nums sm:text-2xl ${
@@ -782,7 +822,7 @@ export default function Dashboard({
                 </article>
                 <article className="min-w-0 border-l border-surface-variant p-4">
                   <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
-                    Total balance
+                    Available balance
                   </p>
                   <p className="mt-1 break-all text-lg font-bold tabular-nums sm:text-2xl">
                     {formatCurrency(totalBalance)}
@@ -962,6 +1002,7 @@ export default function Dashboard({
             {!isLoadingTransactions && view === "reports" ? (
               <div className="animate-screen-in" key={`annual-${selectedYear}`}>
                 <AnnualReportDashboard
+                  endingSavingsBalance={yearEndSavingsBalance}
                   transactions={transactions}
                   year={selectedYear}
                   onYearChange={(year) => {
@@ -992,6 +1033,7 @@ export default function Dashboard({
           }
           currencySymbol={currencySymbol}
           defaultDate={modalState.date}
+          formattedSavingsBalance={formatCurrency(currentSavingsBalance)}
           initialDraft={modalState.initialDraft}
           initialType={modalState.type}
           isWriteDisabled={isOffline}

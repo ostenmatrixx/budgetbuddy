@@ -516,6 +516,28 @@ export async function getAccountBalance(): Promise<number> {
   return balance;
 }
 
+export async function getSavingsBalance(
+  throughDate?: string,
+  excludedTransactionId?: string
+): Promise<number> {
+  const { data, error } = await getSupabaseClient().rpc("get_savings_balance", {
+    through_date: throughDate ?? null,
+    excluded_transaction_id: excludedTransactionId ?? null
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const balance = Number(data ?? 0);
+
+  if (!Number.isFinite(balance)) {
+    throw new Error("The savings balance returned by the database is invalid.");
+  }
+
+  return balance;
+}
+
 export async function loadBudgetPreference(userId: string): Promise<BudgetPreference> {
   const { data, error } = await getSupabaseClient()
     .from(budgetPreferencesTableName)

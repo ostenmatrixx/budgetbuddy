@@ -27,6 +27,7 @@ interface TransactionFormModalProps {
   initialDraft?: TransactionDraft;
   isWriteDisabled?: boolean;
   recentPrefills?: TransactionPrefill[];
+  formattedSavingsBalance?: string;
   subcategoriesByType: TransactionSubcategoriesByType;
   transaction?: Transaction;
   currencySymbol?: string;
@@ -37,6 +38,7 @@ interface TransactionFormModalProps {
 
 export default function TransactionFormModal({
   defaultDate,
+  formattedSavingsBalance,
   initialType,
   initialDraft,
   isWriteDisabled = false,
@@ -319,6 +321,18 @@ export default function TransactionFormModal({
                   </span>
                 ) : null}
               </label>
+            ) : null}
+
+            {selectedType === "savings_withdrawal" ? (
+              <div className="col-span-12 rounded-xl border border-surface-variant bg-surface-container-low p-4 text-left text-sm text-on-surface-variant">
+                <p className="font-semibold text-on-surface">
+                  Available savings: {formattedSavingsBalance ?? `${currencySymbol}0.00`}
+                </p>
+                <p className="mt-1">
+                  This makes saved money available without counting it as income. Record the
+                  purchase separately under Essentials or Non-Essentials.
+                </p>
+              </div>
             ) : null}
 
             <label

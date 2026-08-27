@@ -20,7 +20,8 @@ const dotClasses: Record<TransactionType, string> = {
   income: "bg-primary",
   bills: "bg-primary-fixed-dim",
   non_essentials: "bg-on-surface",
-  savings: "bg-tertiary"
+  savings: "bg-tertiary",
+  savings_withdrawal: "bg-outline"
 };
 
 export default function CalendarWidget({

@@ -6,17 +6,22 @@ import AnnualFlowBarChart from "./AnnualFlowBarChart";
 import AnnualSummaryCards from "./AnnualSummaryCards";
 
 interface AnnualReportDashboardProps {
+  endingSavingsBalance: number;
   transactions: Transaction[];
   year: number;
   onYearChange: (year: number) => void;
 }
 
 export default function AnnualReportDashboard({
+  endingSavingsBalance,
   transactions,
   year,
   onYearChange
 }: AnnualReportDashboardProps) {
-  const report = useMemo(() => calculateAnnualReport(transactions, year), [transactions, year]);
+  const report = useMemo(
+    () => ({ ...calculateAnnualReport(transactions, year), endingSavingsBalance }),
+    [endingSavingsBalance, transactions, year]
+  );
 
   return (
     <section className="animate-screen-in flex flex-col gap-5">

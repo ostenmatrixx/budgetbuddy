@@ -14,6 +14,7 @@ import {
   draftToInsertPayload,
   draftToUpdatePayload,
   getAccountBalance,
+  getSavingsBalance,
   loadActivityPage,
   loadSavingsGoalProgress,
   loadTransactions,
@@ -317,6 +318,24 @@ describe("account balance RPC", () => {
     vi.mocked(getSupabaseClient).mockReturnValue({ rpc } as never);
 
     await expect(getAccountBalance()).rejects.toThrow("account balance returned");
+  });
+
+  it("requests a savings balance through a date while excluding an edited transaction", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "2500.25", error: null });
+    vi.mocked(getSupabaseClient).mockReturnValue({ rpc } as never);
+
+    await expect(getSavingsBalance("2026-08-27", "transaction-id")).resolves.toBe(2500.25);
+    expect(rpc).toHaveBeenCalledWith("get_savings_balance", {
+      through_date: "2026-08-27",
+      excluded_transaction_id: "transaction-id"
+    });
+  });
+
+  it("rejects invalid savings balance results", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "not-a-number", error: null });
+    vi.mocked(getSupabaseClient).mockReturnValue({ rpc } as never);
+
+    await expect(getSavingsBalance()).rejects.toThrow("savings balance returned");
   });
 });
 
