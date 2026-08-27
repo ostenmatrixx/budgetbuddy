@@ -5,6 +5,7 @@ import {
   calculateAnnualReport,
   calculateBudgetSummary,
   calculateCategoryPieSegments,
+  calculateSavingsBalance,
   calculateSubcategoryGroups,
   clampTransactionPage,
   filterTransactionsByMonth,
@@ -159,6 +160,9 @@ describe("calculateBudgetSummary", () => {
     expect(result.billsSpent).toBe(12000);
     expect(result.nonEssentialsSpent).toBe(4000);
     expect(result.savingsSaved).toBe(15000);
+    expect(result.savingsWithdrawn).toBe(0);
+    expect(result.savingsBalance).toBe(15000);
+    expect(result.availableFunds).toBe(50000);
     expect(result.totalSpent).toBe(16000);
     expect(result.remainingIncome).toBe(19000);
     expect(result.essentialsTarget).toBe(25000);
@@ -181,6 +185,44 @@ describe("calculateBudgetSummary", () => {
     expect(result.nonEssentialsTarget).toBe(10000);
     expect(result.essentialsRemaining).toBe(18000);
     expect(result.nonEssentialsRemaining).toBe(6000);
+  });
+
+  it("uses withdrawals as available funds and reduces the rolling savings balance", () => {
+    const result = calculateBudgetSummary(
+      [
+        ...transactions,
+        createTransaction("prior-savings", "savings", 5000, "2026-04-20"),
+        createTransaction("withdrawal", "savings_withdrawal", 2000, "2026-05-20"),
+        createTransaction("purchase", "non_essentials", 2000, "2026-05-20")
+      ],
+      2026,
+      5
+    );
+
+    expect(result.totalIncome).toBe(50000);
+    expect(result.savingsSaved).toBe(15000);
+    expect(result.savingsWithdrawn).toBe(2000);
+    expect(result.savingsBalance).toBe(18000);
+    expect(result.availableFunds).toBe(52000);
+    expect(result.totalSpent).toBe(18000);
+    expect(result.remainingIncome).toBe(19000);
+  });
+});
+
+describe("calculateSavingsBalance", () => {
+  const savingsTransactions = [
+    createTransaction("deposit-1", "savings", 10000, "2026-01-10"),
+    createTransaction("withdrawal-1", "savings_withdrawal", 2500, "2026-02-10"),
+    createTransaction("deposit-2", "savings", 3000, "2026-03-10")
+  ];
+
+  it("calculates the balance through a date", () => {
+    expect(calculateSavingsBalance(savingsTransactions, "2026-02-28")).toBe(7500);
+    expect(calculateSavingsBalance(savingsTransactions, "2026-12-31")).toBe(10500);
+  });
+
+  it("can exclude an edited transaction from the available balance", () => {
+    expect(calculateSavingsBalance(savingsTransactions, "2026-02-28", "withdrawal-1")).toBe(10000);
   });
 });
 
@@ -255,6 +297,8 @@ describe("calculateAnnualReport", () => {
       billsSpent: 18000,
       nonEssentialsSpent: 3500,
       savingsSaved: 9000,
+      savingsWithdrawn: 0,
+      availableFunds: 45000,
       totalSpent: 21500,
       outflow: 30500,
       remainingIncome: 14500
@@ -266,6 +310,8 @@ describe("calculateAnnualReport", () => {
       billsSpent: 12000,
       nonEssentialsSpent: 4000,
       savingsSaved: 15000,
+      savingsWithdrawn: 0,
+      availableFunds: 50000,
       totalSpent: 16000,
       outflow: 31000,
       remainingIncome: 19000
@@ -280,10 +326,29 @@ describe("calculateAnnualReport", () => {
       billsSpent: 30000,
       nonEssentialsSpent: 7500,
       savingsSaved: 24000,
+      savingsWithdrawn: 0,
+      availableFunds: 105000,
       totalSpent: 37500,
       outflow: 61500,
       remainingIncome: 43500
     });
+    expect(result.endingSavingsBalance).toBe(24000);
+  });
+
+  it("adds withdrawals to available funds without inflating income", () => {
+    const result = calculateAnnualReport(
+      [
+        ...annualTransactions,
+        createTransaction("annual-withdrawal", "savings_withdrawal", 2000, "2026-02-10")
+      ],
+      2026
+    );
+
+    expect(result.yearly.totalIncome).toBe(105000);
+    expect(result.yearly.savingsWithdrawn).toBe(2000);
+    expect(result.yearly.availableFunds).toBe(107000);
+    expect(result.yearly.remainingIncome).toBe(45500);
+    expect(result.endingSavingsBalance).toBe(22000);
   });
 
   it("returns the largest annual chart value for proportional bars", () => {
@@ -303,10 +368,13 @@ describe("calculateAnnualReport", () => {
       billsSpent: 0,
       nonEssentialsSpent: 0,
       savingsSaved: 0,
+      savingsWithdrawn: 0,
+      availableFunds: 0,
       totalSpent: 0,
       outflow: 0,
       remainingIncome: 0
     });
+    expect(result.endingSavingsBalance).toBe(24000);
     expect(result.months.every((month) => month.totalIncome === 0)).toBe(true);
   });
 });
@@ -750,6 +818,22 @@ describe("validateTransactionInput", () => {
     expect(result.value?.subcategory).toBeUndefined();
   });
 
+  it("accepts a savings withdrawal transaction", () => {
+    const result = validateTransactionInput({
+      type: "savings_withdrawal",
+      amount: "2000",
+      date: "2026-05-15",
+      description: "Emergency repair transfer",
+      subcategory: "",
+      notes: ""
+    });
+
+    expect(result.value).toMatchObject({
+      type: "savings_withdrawal",
+      amount: 2000
+    });
+  });
+
   it("requires a selected subcategory to be active for its type", () => {
     const options: TransactionSubcategoriesByType = {
       income: [createSubcategory("income-paycheck", "income", "Paycheck")],
@@ -807,5 +891,24 @@ function createSubcategory(
     isActive,
     createdAt: "2026-05-01T00:00:00.000Z",
     updatedAt: "2026-05-01T00:00:00.000Z"
+  };
+}
+
+function createTransaction(
+  id: string,
+  type: Transaction["type"],
+  amount: number,
+  date: string
+): Transaction {
+  return {
+    id,
+    version: 1,
+    type,
+    amount,
+    date,
+    description: id,
+    notes: "",
+    createdAt: `${date}T00:00:00.000Z`,
+    updatedAt: `${date}T00:00:00.000Z`
   };
 }

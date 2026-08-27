@@ -8,7 +8,7 @@ interface AnnualCategoryBarChartProps {
 const categories: Array<{
   key: keyof Pick<
     AnnualMonthReport,
-    "totalIncome" | "billsSpent" | "nonEssentialsSpent" | "savingsSaved"
+    "totalIncome" | "billsSpent" | "nonEssentialsSpent" | "savingsSaved" | "savingsWithdrawn"
   >;
   label: string;
   className: string;
@@ -16,7 +16,8 @@ const categories: Array<{
   { key: "totalIncome", label: "Income", className: "bg-primary" },
   { key: "billsSpent", label: "Essentials", className: "bg-secondary" },
   { key: "nonEssentialsSpent", label: "Non-Essentials", className: "bg-tertiary" },
-  { key: "savingsSaved", label: "Savings", className: "bg-primary-fixed-dim" }
+  { key: "savingsSaved", label: "Savings Added", className: "bg-primary-fixed-dim" },
+  { key: "savingsWithdrawn", label: "Savings Withdrawn", className: "bg-outline" }
 ];
 
 export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChartProps) {
@@ -32,7 +33,7 @@ export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChar
             Monthly Category Breakdown
           </h2>
           <p className="mt-1 text-body-md font-body-md text-on-surface-variant">
-            Income, essentials, non-essentials, and savings by month.
+            Income, spending, savings added, and savings withdrawn by month.
           </p>
         </div>
         <Legend />
@@ -106,7 +107,7 @@ export default function AnnualCategoryBarChart({ report }: AnnualCategoryBarChar
 
 function Legend() {
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-surface-variant bg-surface-container-low p-3 text-label-sm font-label-sm text-on-surface-variant">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-surface-variant bg-surface-container-low p-3 text-label-sm font-label-sm text-on-surface-variant sm:grid-cols-3">
       {categories.map((category) => (
         <span className="flex items-center gap-2" key={category.key}>
           <span className={`h-2.5 w-2.5 rounded-full ${category.className}`} />

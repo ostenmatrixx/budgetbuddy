@@ -11,10 +11,16 @@ export default function AnnualSummaryCards({ report }: AnnualSummaryCardsProps) 
     { label: "Income", value: report.yearly.totalIncome },
     { label: "Essentials", value: report.yearly.billsSpent },
     { label: "Non-Essentials", value: report.yearly.nonEssentialsSpent },
-    { label: "Savings", value: report.yearly.savingsSaved },
+    { label: "Savings Added", value: report.yearly.savingsSaved },
+    { label: "Savings Withdrawn", value: report.yearly.savingsWithdrawn },
+    {
+      label: "Ending Savings Balance",
+      value: report.endingSavingsBalance,
+      alert: report.endingSavingsBalance < 0
+    },
     { label: "Total Spent", value: report.yearly.totalSpent },
     {
-      label: "Remaining Income",
+      label: "Remaining Funds",
       value: report.yearly.remainingIncome,
       alert: report.yearly.remainingIncome < 0,
       positive: report.yearly.remainingIncome > 0

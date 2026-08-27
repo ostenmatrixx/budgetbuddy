@@ -1,4 +1,10 @@
-export const transactionTypes = ["income", "bills", "non_essentials", "savings"] as const;
+export const transactionTypes = [
+  "income",
+  "bills",
+  "non_essentials",
+  "savings",
+  "savings_withdrawal"
+] as const;
 
 export const TRANSACTION_DESCRIPTION_MAX_LENGTH = 200;
 export const TRANSACTION_NOTES_MAX_LENGTH = 2000;
@@ -59,12 +65,14 @@ export const transactionTypeLabels: Record<TransactionType, string> = {
   income: "Income",
   bills: "Essentials",
   non_essentials: "Non-Essentials",
-  savings: "Savings"
+  savings: "Savings",
+  savings_withdrawal: "Savings Withdrawals"
 };
 
 export const transactionTypeShortLabels: Record<TransactionType, string> = {
   income: "Income",
   bills: "Essentials",
   non_essentials: "Non-Essentials",
-  savings: "Savings"
+  savings: "Savings",
+  savings_withdrawal: "Savings Withdrawal"
 };

@@ -43,6 +43,9 @@ export interface BudgetSummary {
   billsSpent: number;
   nonEssentialsSpent: number;
   savingsSaved: number;
+  savingsWithdrawn: number;
+  savingsBalance: number;
+  availableFunds: number;
   totalSpent: number;
   remainingIncome: number;
   essentialsTarget: number;
@@ -58,6 +61,8 @@ export interface AnnualTotals {
   billsSpent: number;
   nonEssentialsSpent: number;
   savingsSaved: number;
+  savingsWithdrawn: number;
+  availableFunds: number;
   totalSpent: number;
   outflow: number;
   remainingIncome: number;
@@ -72,6 +77,7 @@ export interface AnnualReport {
   year: number;
   months: AnnualMonthReport[];
   yearly: AnnualTotals;
+  endingSavingsBalance: number;
   maxChartValue: number;
   hasTransactions: boolean;
 }
@@ -135,8 +141,11 @@ export function calculateBudgetSummary(
   const billsSpent = sumByType(monthlyTransactions, "bills");
   const nonEssentialsSpent = sumByType(monthlyTransactions, "non_essentials");
   const savingsSaved = sumByType(monthlyTransactions, "savings");
+  const savingsWithdrawn = sumByType(monthlyTransactions, "savings_withdrawal");
+  const savingsBalance = calculateSavingsBalance(transactions, getLastDateOfMonth(year, month));
+  const availableFunds = toMoney(totalIncome + savingsWithdrawn);
   const totalSpent = toMoney(billsSpent + nonEssentialsSpent);
-  const remainingIncome = toMoney(totalIncome - billsSpent - nonEssentialsSpent - savingsSaved);
+  const remainingIncome = toMoney(availableFunds - billsSpent - nonEssentialsSpent - savingsSaved);
   const essentialsTarget = toMoney(totalIncome * (budgetPreference.essentialsPercent / 100));
   const savingsTarget = toMoney(totalIncome * (budgetPreference.savingsPercent / 100));
   const nonEssentialsTarget = toMoney(totalIncome * (budgetPreference.nonEssentialsPercent / 100));
@@ -146,6 +155,9 @@ export function calculateBudgetSummary(
     billsSpent,
     nonEssentialsSpent,
     savingsSaved,
+    savingsWithdrawn,
+    savingsBalance,
+    availableFunds,
     totalSpent,
     remainingIncome,
     essentialsTarget,
@@ -297,6 +309,8 @@ export function calculateAnnualReport(transactions: Transaction[], year: number)
       billsSpent: toMoney(totals.billsSpent + month.billsSpent),
       nonEssentialsSpent: toMoney(totals.nonEssentialsSpent + month.nonEssentialsSpent),
       savingsSaved: toMoney(totals.savingsSaved + month.savingsSaved),
+      savingsWithdrawn: toMoney(totals.savingsWithdrawn + month.savingsWithdrawn),
+      availableFunds: toMoney(totals.availableFunds + month.availableFunds),
       totalSpent: toMoney(totals.totalSpent + month.totalSpent),
       outflow: toMoney(totals.outflow + month.outflow),
       remainingIncome: toMoney(totals.remainingIncome + month.remainingIncome)
@@ -310,6 +324,8 @@ export function calculateAnnualReport(transactions: Transaction[], year: number)
       month.billsSpent,
       month.nonEssentialsSpent,
       month.savingsSaved,
+      month.savingsWithdrawn,
+      month.availableFunds,
       month.outflow
     ])
   );
@@ -318,6 +334,7 @@ export function calculateAnnualReport(transactions: Transaction[], year: number)
     year,
     months,
     yearly,
+    endingSavingsBalance: calculateSavingsBalance(transactions, `${year}-12-31`),
     maxChartValue,
     hasTransactions: annualTransactions.length > 0
   };
@@ -497,6 +514,33 @@ export function validateTransactionInput(
   };
 }
 
+export function calculateSavingsBalance(
+  transactions: Transaction[],
+  throughDate?: string,
+  excludedTransactionId?: string
+): number {
+  return toMoney(
+    transactions.reduce((balance, transaction) => {
+      if (
+        transaction.id === excludedTransactionId ||
+        (throughDate && transaction.date > throughDate)
+      ) {
+        return balance;
+      }
+
+      if (transaction.type === "savings") {
+        return balance + transaction.amount;
+      }
+
+      if (transaction.type === "savings_withdrawal") {
+        return balance - transaction.amount;
+      }
+
+      return balance;
+    }, 0)
+  );
+}
+
 export function progressPercent(actual: number, target: number): number {
   if (target <= 0) {
     return 0;
@@ -588,6 +632,8 @@ function createAnnualMonthReport(month: number, transactions: Transaction[]): An
   const billsSpent = sumByType(transactions, "bills");
   const nonEssentialsSpent = sumByType(transactions, "non_essentials");
   const savingsSaved = sumByType(transactions, "savings");
+  const savingsWithdrawn = sumByType(transactions, "savings_withdrawal");
+  const availableFunds = toMoney(totalIncome + savingsWithdrawn);
   const totalSpent = toMoney(billsSpent + nonEssentialsSpent);
   const outflow = toMoney(totalSpent + savingsSaved);
 
@@ -598,9 +644,11 @@ function createAnnualMonthReport(month: number, transactions: Transaction[]): An
     billsSpent,
     nonEssentialsSpent,
     savingsSaved,
+    savingsWithdrawn,
+    availableFunds,
     totalSpent,
     outflow,
-    remainingIncome: toMoney(totalIncome - outflow)
+    remainingIncome: toMoney(availableFunds - outflow)
   };
 }
 
@@ -610,10 +658,17 @@ function createEmptyAnnualTotals(): AnnualTotals {
     billsSpent: 0,
     nonEssentialsSpent: 0,
     savingsSaved: 0,
+    savingsWithdrawn: 0,
+    availableFunds: 0,
     totalSpent: 0,
     outflow: 0,
     remainingIncome: 0
   };
+}
+
+export function getLastDateOfMonth(year: number, month: number): string {
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 }
 
 function toMoney(value: number): number {

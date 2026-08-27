@@ -213,6 +213,13 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
+      get_savings_balance: {
+        Args: {
+          through_date?: string | null;
+          excluded_transaction_id?: string | null;
+        };
+        Returns: number;
+      };
       advance_recurring_date: {
         Args: {
           schedule_start: string;

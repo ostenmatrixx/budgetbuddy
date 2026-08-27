@@ -8,7 +8,7 @@ async function completeRequiredFields() {
   const user = userEvent.setup();
 
   await user.selectOptions(screen.getByLabelText("Type"), "bills");
-  await user.type(screen.getByLabelText(/Transaction amount/i), "125.50");
+  await user.type(screen.getByLabelText(/Transaction amount/i), "125");
   await user.type(screen.getByLabelText("Description"), "Groceries");
 
   return user;
@@ -84,6 +84,21 @@ describe("TransactionFormModal", () => {
     expect(screen.getByLabelText("Transaction amount")).toHaveValue(500);
     expect(screen.getByLabelText("Description")).toHaveValue("Internet bill");
     expect(screen.getByLabelText("Date")).toHaveValue("2026-07-25");
+  });
+
+  it("explains how savings withdrawals affect tracking", () => {
+    render(
+      <TransactionFormModal
+        formattedSavingsBalance="₱12,500.00"
+        initialType="savings_withdrawal"
+        subcategoriesByType={{}}
+        onClose={vi.fn()}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    expect(screen.getByText(/Available savings:/)).toHaveTextContent("₱12,500.00");
+    expect(screen.getByText(/without counting it as income/i)).toBeInTheDocument();
   });
 });
 

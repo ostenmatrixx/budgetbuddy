@@ -12,16 +12,17 @@ export default function AnnualFlowBarChart({ report }: AnnualFlowBarChartProps) 
         <div className="min-w-0">
           <p className="text-label-sm font-label-sm uppercase text-outline">Cash Flow</p>
           <h2 className="mt-1 text-headline-md font-headline-md text-on-surface">
-            Income vs Outflow
+            Available Funds vs Outflow
           </h2>
           <p className="mt-1 text-body-md font-body-md text-on-surface-variant">
-            Outflow includes essentials, non-essentials, and savings.
+            Available funds include income and savings withdrawals. Outflow includes spending and
+            savings contributions.
           </p>
         </div>
         <div className="flex gap-4 rounded-lg border border-surface-variant bg-surface-container-low p-3 text-label-sm font-label-sm text-on-surface-variant">
           <span className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-            Income
+            Available Funds
           </span>
           <span className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-secondary" />
@@ -40,8 +41,8 @@ export default function AnnualFlowBarChart({ report }: AnnualFlowBarChartProps) 
               <p className="text-label-sm font-label-sm text-outline">{month.monthLabel}</p>
               <div className="grid gap-1.5">
                 <Bar
-                  label={`${month.monthLabel} income`}
-                  value={month.totalIncome}
+                  label={`${month.monthLabel} available funds`}
+                  value={month.availableFunds}
                   max={report.maxChartValue}
                   className="bg-primary"
                 />

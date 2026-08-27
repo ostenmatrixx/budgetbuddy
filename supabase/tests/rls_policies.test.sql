@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(100);
+select plan(109);
 
 select has_table('public', 'transactions', 'transactions table exists');
 select has_table('public', 'budget_preferences', 'budget preferences table exists');
@@ -22,6 +22,12 @@ select has_function(
   'get_account_balance',
   array[]::text[],
   'account balance function exists without user-controlled arguments'
+);
+select has_function(
+  'public',
+  'get_savings_balance',
+  array['date', 'uuid'],
+  'savings balance function exists with bounded lookup arguments'
 );
 
 select is(
@@ -87,6 +93,14 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'public.get_account_balance()', 'execute'),
   'authenticated users can execute the account balance function'
+);
+select ok(
+  not has_function_privilege('anon', 'public.get_savings_balance(date,uuid)', 'execute'),
+  'anon cannot execute the savings balance function'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.get_savings_balance(date,uuid)', 'execute'),
+  'authenticated users can execute the savings balance function'
 );
 select ok(
   not has_function_privilege(
@@ -237,6 +251,65 @@ select results_eq(
   $$ values (1000::numeric) $$,
   'account balance includes only the authenticated owner transactions'
 );
+
+insert into public.transactions (
+  id, client_request_id, user_id, type, amount, date, description, notes
+)
+values
+  (
+    'abababab-abab-4bab-8bab-abababababab',
+    'abababab-1111-4111-8111-abababababab',
+    '11111111-1111-4111-8111-111111111111',
+    'savings', 300, '2026-07-23', 'Emergency savings', ''
+  ),
+  (
+    'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+    'cdcdcdcd-1111-4111-8111-cdcdcdcdcdcd',
+    '11111111-1111-4111-8111-111111111111',
+    'savings_withdrawal', 100, '2026-07-24', 'Emergency withdrawal', ''
+  );
+
+select results_eq(
+  $$ select public.get_account_balance() $$,
+  $$ values (800::numeric) $$,
+  'savings withdrawals increase available account balance without counting as income'
+);
+select results_eq(
+  $$ select public.get_savings_balance(null, null) $$,
+  $$ values (200::numeric) $$,
+  'savings balance subtracts withdrawals from saved money'
+);
+select results_eq(
+  $$ select public.get_savings_balance('2026-07-23', null) $$,
+  $$ values (300::numeric) $$,
+  'savings balance can be bounded through a transaction date'
+);
+select results_eq(
+  $$ select public.get_savings_balance(null, 'abababab-abab-4bab-8bab-abababababab') $$,
+  $$ values (-100::numeric) $$,
+  'savings balance can exclude the transaction being edited'
+);
+
+delete from public.transactions
+where id in (
+  'abababab-abab-4bab-8bab-abababababab',
+  'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'
+);
+
+select lives_ok(
+  $$
+    insert into public.recurring_items (
+      id, user_id, type, amount, description, frequency, start_date, next_due_date
+    ) values (
+      'dededede-dede-4ede-8ede-dededededede',
+      '11111111-1111-4111-8111-111111111111',
+      'savings_withdrawal', 50, 'Monthly savings draw', 'monthly', '2026-08-01', '2026-08-01'
+    )
+  $$,
+  'savings withdrawals can be scheduled as recurring items'
+);
+
+delete from public.recurring_items where id = 'dededede-dede-4ede-8ede-dededededede';
 select results_eq(
   $$ update public.budget_preferences set essentials_percent = 60, savings_percent = 20, non_essentials_percent = 20 returning 1 $$,
   $$ values (1) $$,
@@ -439,6 +512,11 @@ select results_eq(
   $$ select public.get_account_balance() $$,
   $$ values (0::numeric) $$,
   'account balance cannot expose another owners transactions'
+);
+select results_eq(
+  $$ select public.get_savings_balance(null, null) $$,
+  $$ values (0::numeric) $$,
+  'savings balance cannot expose another owners transactions'
 );
 select results_eq(
   $$ select count(*) from public.recurring_items $$,

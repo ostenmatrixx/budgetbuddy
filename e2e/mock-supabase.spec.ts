@@ -356,7 +356,35 @@ async function installMockSupabase(page: Page, database: MockDatabase) {
     if (url.pathname === "/rest/v1/rpc/get_account_balance") {
       const balance = database.transactions.reduce((total, transaction) => {
         const amount = Number(transaction.amount ?? 0);
-        return transaction.type === "income" ? total + amount : total - amount;
+        return transaction.type === "income" || transaction.type === "savings_withdrawal"
+          ? total + amount
+          : total - amount;
+      }, 0);
+      await fulfillJson(route, balance);
+      return;
+    }
+
+    if (url.pathname === "/rest/v1/rpc/get_savings_balance") {
+      const payload = request.postDataJSON() as {
+        through_date?: string | null;
+        excluded_transaction_id?: string | null;
+      };
+      const balance = database.transactions.reduce((total, transaction) => {
+        if (
+          (payload.through_date && String(transaction.date) > payload.through_date) ||
+          transaction.id === payload.excluded_transaction_id
+        ) {
+          return total;
+        }
+
+        const amount = Number(transaction.amount ?? 0);
+        if (transaction.type === "savings") {
+          return total + amount;
+        }
+        if (transaction.type === "savings_withdrawal") {
+          return total - amount;
+        }
+        return total;
       }, 0);
       await fulfillJson(route, balance);
       return;

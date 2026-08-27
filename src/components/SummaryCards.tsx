@@ -15,10 +15,17 @@ export default function SummaryCards({
     { label: "Income", value: summary.totalIncome, tone: "primary" },
     { label: "Essentials", value: summary.billsSpent },
     { label: "Non-Essentials", value: summary.nonEssentialsSpent },
-    { label: "Savings", value: summary.savingsSaved },
+    { label: "Savings Added", value: summary.savingsSaved },
+    { label: "Savings Withdrawn", value: summary.savingsWithdrawn },
+    {
+      label: "Savings Balance",
+      value: summary.savingsBalance,
+      alert: summary.savingsBalance < 0,
+      tone: "primary"
+    },
     { label: "Total Spent", value: summary.totalSpent },
     {
-      label: "Remaining Income",
+      label: "Remaining Funds",
       value: summary.remainingIncome,
       alert: summary.remainingIncome < 0,
       tone:

@@ -238,9 +238,31 @@ async function installMockSupabase(page) {
 
     if (url.pathname === "/rest/v1/rpc/get_account_balance") {
       const balance = transactions.reduce((total, transaction) => {
-        return transaction.type === "income"
+        return transaction.type === "income" || transaction.type === "savings_withdrawal"
           ? total + Number(transaction.amount)
           : total - Number(transaction.amount);
+      }, 0);
+      await fulfillJson(route, balance);
+      return;
+    }
+
+    if (url.pathname === "/rest/v1/rpc/get_savings_balance") {
+      const payload = request.postDataJSON() ?? {};
+      const balance = transactions.reduce((total, transaction) => {
+        if (
+          (payload.through_date && transaction.date > payload.through_date) ||
+          transaction.id === payload.excluded_transaction_id
+        ) {
+          return total;
+        }
+
+        if (transaction.type === "savings") {
+          return total + Number(transaction.amount);
+        }
+        if (transaction.type === "savings_withdrawal") {
+          return total - Number(transaction.amount);
+        }
+        return total;
       }, 0);
       await fulfillJson(route, balance);
       return;

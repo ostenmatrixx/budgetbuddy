@@ -891,6 +891,8 @@ function getCategoryIcon(type: TransactionType) {
       return "shopping_bag";
     case "savings":
       return "savings";
+    case "savings_withdrawal":
+      return "system_update_alt";
     case "income":
       return "payments";
     default:
