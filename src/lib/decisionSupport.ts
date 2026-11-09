@@ -26,7 +26,8 @@ export function calculateMonthlyInsights(
   year: number,
   month: number,
   preference: BudgetPreference,
-  todayKey: string
+  todayKey: string,
+  availableBalance?: number
 ): MonthlyInsights {
   const today = parseDateKey(todayKey);
   const selectedKey = year * 12 + month;
@@ -59,7 +60,9 @@ export function calculateMonthlyInsights(
     period,
     safeToSpendPerDay:
       period === "current" && remainingDays > 0
-        ? roundMoney(Math.max(currentSummary.remainingIncome, 0) / remainingDays)
+        ? roundMoney(
+            Math.max(availableBalance ?? currentSummary.remainingIncome, 0) / remainingDays
+          )
         : undefined,
     savingsRate:
       currentSummary.totalIncome > 0
@@ -188,24 +191,27 @@ export function calculateSavingsGoalProgress(
 
 export function buildInAppAlerts({
   summary,
+  availableBalance = summary.remainingIncome,
   recurringItems,
   goals,
   todayKey
 }: {
   summary: BudgetSummary;
+  availableBalance?: number;
   recurringItems: RecurringItem[];
   goals: Array<{ goal: SavingsGoal; progress: SavingsGoalProgress }>;
   todayKey: string;
 }): InAppAlert[] {
   const alerts: InAppAlert[] = [];
 
-  if (summary.remainingIncome < 0) {
+  if (availableBalance < 0) {
     alerts.push({
       id: "negative-remaining-income",
       group: "critical",
       icon: "warning",
-      title: "Income is fully allocated",
-      message: "This month’s outflow is higher than recorded income."
+      title: "Remaining funds are below zero",
+      message:
+        "Your available balance is negative, including balances carried over from previous months."
     });
   }
 

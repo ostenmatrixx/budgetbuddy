@@ -7,6 +7,7 @@ import AnnualSummaryCards from "./AnnualSummaryCards";
 
 interface AnnualReportDashboardProps {
   endingSavingsBalance: number;
+  remainingFunds: number;
   transactions: Transaction[];
   year: number;
   onYearChange: (year: number) => void;
@@ -14,6 +15,7 @@ interface AnnualReportDashboardProps {
 
 export default function AnnualReportDashboard({
   endingSavingsBalance,
+  remainingFunds,
   transactions,
   year,
   onYearChange
@@ -56,7 +58,7 @@ export default function AnnualReportDashboard({
         </p>
       </div>
 
-      <AnnualSummaryCards report={report} />
+      <AnnualSummaryCards remainingFunds={remainingFunds} report={report} />
 
       {!report.hasTransactions ? (
         <div className="app-surface animate-card-in p-6 text-body-md font-body-md text-on-surface-variant">

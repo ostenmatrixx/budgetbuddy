@@ -25,8 +25,14 @@ The project follows [Semantic Versioning](https://semver.org/) once releases are
 - Private vulnerability reporting and contribution policies
 - Architecture, repository governance, security operations, incident response, retention, and privacy/terms readiness documentation
 
+### Fixed
+
+- Remaining funds now matches the account-wide available balance, including prior-month deficits and positive carryover, across monthly and annual views
+- Daily spending allowances and negative-balance alerts now account for carried balances
+
 ### Security
 
+- Patched high-severity findings in build and development dependencies without changing declared package ranges
 - Owner validation, row-level security, account-deletion cascades, and optimistic concurrency for decision-support records
 - Offline blocking for all new financial writes while retaining already-loaded data in memory
 - Automated JavaScript and TypeScript CodeQL analysis on pull requests, `main`, and a weekly schedule
