@@ -3,7 +3,6 @@ import { useUserSettings } from "../contexts/UserSettingsContext";
 import { usePwaStatus } from "../hooks/usePwaStatus";
 import {
   DEFAULT_BUDGET_PREFERENCES,
-  calculateAnnualReport,
   calculateCategoryPieSegments,
   calculateBudgetSummary,
   filterTransactionsByMonth,
@@ -269,11 +268,6 @@ export default function Dashboard({
     [budgetPreference, selectedMonth, selectedPeriodSavingsBalance, selectedYear, transactions]
   );
 
-  const annualTopbarSummary = useMemo(
-    () => calculateAnnualReport(transactions, selectedYear),
-    [transactions, selectedYear]
-  );
-
   const todayKey = toDateInputValue(new Date(), settings.timeZone);
   const insights = useMemo(
     () =>
@@ -282,9 +276,10 @@ export default function Dashboard({
         selectedYear,
         selectedMonth,
         budgetPreference,
-        todayKey
+        todayKey,
+        totalBalance
       ),
-    [budgetPreference, selectedMonth, selectedYear, todayKey, transactions]
+    [budgetPreference, selectedMonth, selectedYear, todayKey, totalBalance, transactions]
   );
   const recentPrefills = useMemo(
     () => getRecentTransactionPrefills(transactions, todayKey),
@@ -302,11 +297,12 @@ export default function Dashboard({
     () =>
       buildInAppAlerts({
         summary,
+        availableBalance: totalBalance,
         recurringItems,
         goals: goalsWithProgress,
         todayKey
       }),
-    [goalsWithProgress, recurringItems, summary, todayKey]
+    [goalsWithProgress, recurringItems, summary, todayKey, totalBalance]
   );
 
   const activeTitle =
@@ -317,8 +313,6 @@ export default function Dashboard({
       : view === "activity"
         ? "All transaction history"
         : `${selectedYear} overview`;
-  const activeRemainingIncome =
-    view === "reports" ? annualTopbarSummary.yearly.remainingIncome : summary.remainingIncome;
   const userInitial = (userEmail?.trim().charAt(0) || "B").toUpperCase();
 
   const selectedDateTransactions = useMemo(
@@ -745,13 +739,11 @@ export default function Dashboard({
 
           <div className="flex shrink-0 items-center gap-2 md:gap-3">
             <div className="hidden items-end gap-6 lg:flex">
-              <div className="text-right">
+              <div className="text-right" title="Account-wide balance across all recorded months">
                 <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
                   Remaining funds
                 </p>
-                <p className="text-lg font-bold text-on-surface">
-                  {formatCurrency(activeRemainingIncome)}
-                </p>
+                <p className="text-lg font-bold text-on-surface">{formatCurrency(totalBalance)}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs font-bold uppercase tracking-[0.05em] text-outline">
@@ -810,14 +802,17 @@ export default function Dashboard({
                   </p>
                   <p
                     className={`mt-1 break-all text-lg font-bold tabular-nums sm:text-2xl ${
-                      activeRemainingIncome < 0
+                      totalBalance < 0
                         ? "text-error"
-                        : activeRemainingIncome > 0
+                        : totalBalance > 0
                           ? "text-success"
                           : "text-on-surface"
                     }`}
                   >
-                    {formatCurrency(activeRemainingIncome)}
+                    {formatCurrency(totalBalance)}
+                  </p>
+                  <p className="mt-1 text-xs text-on-surface-variant">
+                    All months, including carryover
                   </p>
                 </article>
                 <article className="min-w-0 border-l border-surface-variant p-4">
@@ -856,7 +851,11 @@ export default function Dashboard({
                       year={selectedYear}
                       onChange={handleMonthChange}
                     />
-                    <SummaryCards hideRemainingBelowDesktop summary={summary} />
+                    <SummaryCards
+                      hideRemainingBelowDesktop
+                      remainingFunds={totalBalance}
+                      summary={summary}
+                    />
                     <MonthlyInsightsCard insights={insights} />
                     <button
                       aria-expanded={isMobileBudgetOpen}
@@ -1003,6 +1002,7 @@ export default function Dashboard({
               <div className="animate-screen-in" key={`annual-${selectedYear}`}>
                 <AnnualReportDashboard
                   endingSavingsBalance={yearEndSavingsBalance}
+                  remainingFunds={totalBalance}
                   transactions={transactions}
                   year={selectedYear}
                   onYearChange={(year) => {

@@ -13,7 +13,7 @@ import {
   validateRecurringItemDraft,
   validateSavingsGoalDraft
 } from "./decisionSupport";
-import { DEFAULT_BUDGET_PREFERENCES } from "./budget";
+import { calculateBudgetSummary, DEFAULT_BUDGET_PREFERENCES } from "./budget";
 import type { SavingsGoal } from "../types/decisionSupport";
 import type { RecurringItem } from "../types/decisionSupport";
 import type { Transaction } from "../types/transaction";
@@ -67,6 +67,29 @@ describe("monthly decision support", () => {
     );
 
     expect(insights.savingsRate).toBeUndefined();
+  });
+
+  it.each([
+    { balance: 4200, daily: 600 },
+    { balance: -500, daily: 0 },
+    { balance: 0, daily: 0 },
+    { balance: 14000, daily: 2000 }
+  ])("uses the carried account balance of $balance for daily spending", ({ balance, daily }) => {
+    const insights = calculateMonthlyInsights(
+      [
+        transaction("income", "income", 10_000, "2026-07-01"),
+        transaction("bill", "bills", 2_000, "2026-07-02"),
+        transaction("saving", "savings", 1_000, "2026-07-03")
+      ],
+      2026,
+      7,
+      DEFAULT_BUDGET_PREFERENCES,
+      "2026-07-25",
+      balance
+    );
+
+    expect(insights.safeToSpendPerDay).toBe(daily);
+    expect(insights.savingsRate).toBe(10);
   });
 
   it("suppresses daily pacing for historical and future months", () => {
@@ -216,6 +239,37 @@ describe("decision-support validation and alerts", () => {
     createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-07-01T00:00:00.000Z"
   };
+
+  it("warns when a carried deficit exceeds this month's remaining income", () => {
+    const alerts = buildInAppAlerts({
+      summary: calculateBudgetSummary(
+        [transaction("income", "income", 1000, "2026-07-01")],
+        2026,
+        7
+      ),
+      availableBalance: -500,
+      recurringItems: [],
+      goals: [],
+      todayKey: "2026-07-25"
+    });
+
+    expect(alerts.find(({ id }) => id === "negative-remaining-income")).toMatchObject({
+      title: "Remaining funds are below zero",
+      message: expect.stringContaining("carried over from previous months")
+    });
+  });
+
+  it("does not warn about negative funds when carryover covers this month's spending", () => {
+    const alerts = buildInAppAlerts({
+      summary: calculateBudgetSummary([transaction("bill", "bills", 1000, "2026-07-01")], 2026, 7),
+      availableBalance: 500,
+      recurringItems: [],
+      goals: [],
+      todayKey: "2026-07-25"
+    });
+
+    expect(alerts.some(({ id }) => id === "negative-remaining-income")).toBe(false);
+  });
 
   it("sorts overdue and upcoming recurring items", () => {
     const upcoming = getUpcomingRecurringItems(

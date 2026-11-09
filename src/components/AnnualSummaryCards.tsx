@@ -2,10 +2,11 @@ import { useUserSettings } from "../contexts/UserSettingsContext";
 import { type AnnualReport } from "../lib/budget";
 
 interface AnnualSummaryCardsProps {
+  remainingFunds: number;
   report: AnnualReport;
 }
 
-export default function AnnualSummaryCards({ report }: AnnualSummaryCardsProps) {
+export default function AnnualSummaryCards({ remainingFunds, report }: AnnualSummaryCardsProps) {
   const { formatCurrency } = useUserSettings();
   const items = [
     { label: "Income", value: report.yearly.totalIncome },
@@ -21,9 +22,10 @@ export default function AnnualSummaryCards({ report }: AnnualSummaryCardsProps) 
     { label: "Total Spent", value: report.yearly.totalSpent },
     {
       label: "Remaining Funds",
-      value: report.yearly.remainingIncome,
-      alert: report.yearly.remainingIncome < 0,
-      positive: report.yearly.remainingIncome > 0
+      value: remainingFunds,
+      alert: remainingFunds < 0,
+      positive: remainingFunds > 0,
+      description: "All months and years, including carryover"
     }
   ];
 
@@ -62,6 +64,9 @@ export default function AnnualSummaryCards({ report }: AnnualSummaryCardsProps) 
           >
             {formatCurrency(item.value)}
           </p>
+          {item.description ? (
+            <p className="mt-1 text-xs text-on-surface-variant">{item.description}</p>
+          ) : null}
         </article>
       ))}
     </section>

@@ -57,6 +57,7 @@ BudgetBuddy brings income, essentials, savings, and everyday spending into one c
 - Tracks income, bills, savings, and non-essential spending with custom subcategories
 - Supports savings withdrawals with a rolling savings balance and separate purchase tracking
 - Shows monthly summaries, category charts, a calendar, a daily log, and annual reports
+- Keeps remaining funds equal to the account-wide available balance, including balances carried over from previous months and years, while period income and spending totals stay separate
 - Adds all-history activity search, monthly decision support, confirmed recurring items, and linked savings goals
 - Supports editable budget allocations, with 50/30/20 defaults
 - Formats dates and money from each account's currency, locale, and timezone settings

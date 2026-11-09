@@ -25,6 +25,11 @@ The project follows [Semantic Versioning](https://semver.org/) once releases are
 - Private vulnerability reporting and contribution policies
 - Architecture, repository governance, security operations, incident response, retention, and privacy/terms readiness documentation
 
+### Fixed
+
+- Remaining funds now matches the account-wide available balance, including prior-month deficits and positive carryover, across monthly and annual views
+- Daily spending allowances and negative-balance alerts now account for carried balances
+
 ### Security
 
 - Owner validation, row-level security, account-deletion cascades, and optimistic concurrency for decision-support records

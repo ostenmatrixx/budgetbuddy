@@ -70,6 +70,7 @@ test("guards duplicate transaction submission and uses an accessible delete conf
     page.locator("article:visible").filter({ hasText: "Mock grocery run" }).first()
   ).toBeVisible();
   expect(database.transactionWrites).toBe(1);
+  await expectAccountBalances(page, -125.5);
   expect(database.transactions).toHaveLength(1);
 
   let transaction = page.locator("article:visible").filter({ hasText: "Mock grocery run" }).first();
@@ -81,6 +82,7 @@ test("guards duplicate transaction submission and uses an accessible delete conf
   ).toBeVisible();
   await expect(page.getByText("Mock grocery run")).toHaveCount(0);
   expect(database.transactionUpdates).toBe(1);
+  await expectAccountBalances(page, -125.5);
   expect(database.transactions[0]).toMatchObject({
     description: "Updated grocery run",
     version: 2
@@ -92,6 +94,63 @@ test("guards duplicate transaction submission and uses an accessible delete conf
   await expect(confirmation).toHaveAccessibleDescription(/Updated grocery run/);
   await confirmation.getByRole("button", { name: "Delete transaction" }).click();
   await expect(page.getByText("Updated grocery run")).toHaveCount(0);
+  await expectAccountBalances(page, 0);
+});
+
+test("carries prior-month and prior-year deficits into remaining funds across views", async ({
+  page
+}) => {
+  await page.clock.setFixedTime(new Date("2026-07-25T04:00:00Z"));
+  const database = createMockDatabase();
+  const entries = [
+    { type: "bills", amount: 2000, date: "2025-12-10" },
+    { type: "bills", amount: 1000, date: "2026-06-10" },
+    { type: "income", amount: 10000, date: "2026-07-01" },
+    { type: "bills", amount: 2000, date: "2026-07-02" },
+    { type: "savings", amount: 1000, date: "2026-07-03" },
+    { type: "savings_withdrawal", amount: 500, date: "2026-07-04" }
+  ];
+  database.transactions = entries.map((entry, index) => ({
+    ...entry,
+    id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(index).padStart(12, "0")}`,
+    user_id: mockUser.id,
+    description: `Carryover test ${index}`,
+    notes: "",
+    subcategory: null,
+    version: 1,
+    created_at: `${entry.date}T00:00:00.000Z`,
+    updated_at: `${entry.date}T00:00:00.000Z`
+  }));
+  await page.unroute("https://mock.supabase.co/**");
+  await installMockSupabase(page, database);
+  await signIn(page);
+
+  // July has 7,500 left; earlier deficits reduce the account-wide balance to 4,500.
+  await expectAccountBalances(page, 4500);
+  const monthlySummary = page.getByRole("region", { name: "Dashboard summary" });
+  await expect(monthlySummary.getByText("Income", { exact: true }).locator("..")).toContainText(
+    "₱10,000.00"
+  );
+  await expect(page.getByText("Safe to spend daily", { exact: true }).locator("..")).toContainText(
+    "₱642.86"
+  );
+
+  await page.getByRole("combobox", { name: "Month", exact: true }).selectOption("6");
+  await expectAccountBalances(page, 4500);
+  await page.getByRole("spinbutton", { name: "Year", exact: true }).fill("2025");
+  await expectAccountBalances(page, 4500);
+
+  await page
+    .getByRole("button", {
+      name: isMobileViewport(page) ? "Reports" : "Annual Report",
+      exact: true
+    })
+    .click();
+  const annualSummary = page.getByRole("region", { name: "Annual summary" });
+  await expect(
+    annualSummary.getByText("Remaining Funds", { exact: true }).locator("../..")
+  ).toContainText("₱4,500.00");
+  await expect(annualSummary.getByText("All months and years, including carryover")).toBeVisible();
 });
 
 test("transaction dialog supports Escape and restores focus to its trigger", async ({
@@ -264,6 +323,20 @@ function getAccountSettingsTrigger(page: Page) {
   return page.getByRole("button", { name: "Account settings" }).first();
 }
 
+async function expectAccountBalances(page: Page, amount: number) {
+  const balances = page
+    .getByText(/^(Remaining funds|Available balance)$/i)
+    .locator("..")
+    .filter({ visible: true });
+  await expect(balances).toHaveCount(isMobileViewport(page) ? 2 : 3);
+  const formatted = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(
+    amount
+  );
+  for (const balance of await balances.all()) {
+    await expect(balance).toContainText(formatted);
+  }
+}
+
 async function installMockSupabase(page: Page, database: MockDatabase) {
   await page.route("https://mock.supabase.co/**", async (route) => {
     const request = route.request();
@@ -349,7 +422,19 @@ async function installMockSupabase(page: Page, database: MockDatabase) {
         return;
       }
 
-      await fulfillJson(route, database.transactions);
+      const dateFilters = url.searchParams.getAll("date");
+      const transactions = database.transactions.filter((transaction) =>
+        dateFilters.every((filter) => {
+          if (filter.startsWith("gte.")) {
+            return String(transaction.date) >= filter.slice(4);
+          }
+          if (filter.startsWith("lte.")) {
+            return String(transaction.date) <= filter.slice(4);
+          }
+          return true;
+        })
+      );
+      await fulfillJson(route, transactions);
       return;
     }
 

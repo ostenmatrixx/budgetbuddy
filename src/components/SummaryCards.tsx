@@ -3,11 +3,13 @@ import { type BudgetSummary } from "../lib/budget";
 
 interface SummaryCardsProps {
   hideRemainingBelowDesktop?: boolean;
+  remainingFunds: number;
   summary: BudgetSummary;
 }
 
 export default function SummaryCards({
   hideRemainingBelowDesktop = false,
+  remainingFunds,
   summary
 }: SummaryCardsProps) {
   const { formatCurrency } = useUserSettings();
@@ -26,10 +28,10 @@ export default function SummaryCards({
     { label: "Total Spent", value: summary.totalSpent },
     {
       label: "Remaining Funds",
-      value: summary.remainingIncome,
-      alert: summary.remainingIncome < 0,
-      tone:
-        summary.remainingIncome < 0 ? "error" : summary.remainingIncome > 0 ? "success" : "neutral",
+      value: remainingFunds,
+      alert: remainingFunds < 0,
+      tone: remainingFunds < 0 ? "error" : remainingFunds > 0 ? "success" : "neutral",
+      description: "All months, including carryover",
       isRemaining: true
     }
   ];
@@ -57,6 +59,9 @@ export default function SummaryCards({
           >
             {formatCurrency(item.value)}
           </p>
+          {item.description ? (
+            <p className="mt-1 text-xs text-on-surface-variant">{item.description}</p>
+          ) : null}
         </article>
       ))}
     </section>
